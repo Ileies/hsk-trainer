@@ -153,36 +153,50 @@
 			.force('link', forceLink(simLinks).distance(60).strength(0.5))
 			.stop();
 
-		for (let i = 0; i < 300; i++) sim.tick();
+		const TOTAL = 300;
+		const CHUNK = 15;
+		let done = 0;
 
-		const cx = simNodes.reduce((s, n) => s + (n.x ?? 0), 0) / simNodes.length;
-		const cy = simNodes.reduce((s, n) => s + (n.y ?? 0), 0) / simNodes.length;
-		for (const n of simNodes) {
-			n.x = (n.x ?? 0) - cx;
-			n.y = (n.y ?? 0) - cy;
+		function tick() {
+			const end = Math.min(done + CHUNK, TOTAL);
+			for (let i = done; i < end; i++) sim.tick();
+			done = end;
+			if (done < TOTAL) {
+				setTimeout(tick, 0);
+				return;
+			}
+
+			const cx = simNodes.reduce((s, n) => s + (n.x ?? 0), 0) / simNodes.length;
+			const cy = simNodes.reduce((s, n) => s + (n.y ?? 0), 0) / simNodes.length;
+			for (const n of simNodes) {
+				n.x = (n.x ?? 0) - cx;
+				n.y = (n.y ?? 0) - cy;
+			}
+
+			nodes = simNodes;
+			nodeById = idToSim;
+			basePositions = simNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
+
+			applyLayout();
+
+			if (canvas) {
+				cam.x = canvas.width / 2;
+				cam.y = canvas.height / 2;
+				cam.scale = minScale;
+				camTarget.x = cam.x;
+				camTarget.y = cam.y;
+				camTarget.scale = minScale;
+			}
+
+			loading = false;
+
+			const hsk1 = simNodes.filter((n) => n.hskLevel === 1);
+			const autoFocus =
+				hsk1.length > 0 ? hsk1[Math.floor(Math.random() * hsk1.length)] : simNodes[0];
+			if (autoFocus) focusNode(autoFocus.id);
 		}
 
-		nodes = simNodes;
-		nodeById = idToSim;
-		basePositions = simNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
-
-		applyLayout();
-
-		if (canvas) {
-			cam.x = canvas.width / 2;
-			cam.y = canvas.height / 2;
-			cam.scale = minScale;
-			camTarget.x = cam.x;
-			camTarget.y = cam.y;
-			camTarget.scale = minScale;
-		}
-
-		loading = false;
-
-		const hsk1 = simNodes.filter((n) => n.hskLevel === 1);
-		const autoFocus =
-			hsk1.length > 0 ? hsk1[Math.floor(Math.random() * hsk1.length)] : simNodes[0];
-		if (autoFocus) focusNode(autoFocus.id);
+		setTimeout(tick, 0);
 	}
 
 	function applyLayout() {
