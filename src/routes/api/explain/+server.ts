@@ -71,7 +71,7 @@ function buildBlankPrompt(
 
 	return `Chinese HSK ${level} word: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
 
-${focus} No pinyin tips. Max 3 sentences.
+${focus} No pinyin tips. Use only pinyin (no hanzi) in your explanation sentences. Max 3 sentences.
 
 Then two ${exampleStyle} example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
 }
@@ -97,7 +97,7 @@ function buildWrongPrompt(
 
 	return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}". ${errorHint[errorType]}
 
-In 2-3 sentences: explain the mistake and how to remember the correct answer. Focus on meaning and associations, not pinyin pronunciation. Be encouraging.
+In 2-3 sentences: explain the mistake and how to remember the correct answer. Focus on meaning and associations, not pinyin pronunciation. Use only pinyin (no hanzi) in your explanation sentences. Be encouraging.
 
 Then two example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
 }
