@@ -39,13 +39,13 @@
 {:else}
 	<!-- Header + overall stats -->
 	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-		<div>
+		<div class="text-center sm:text-left">
 			<h1 class="text-3xl font-bold">Your Progress</h1>
 			<p class="text-base-content/60 mt-1">
 				{totalLearned.toLocaleString()} / {totalWords.toLocaleString()} words learned
 			</p>
 		</div>
-		<div class="flex gap-2">
+		<div class="flex gap-2 justify-center sm:justify-end">
 			<a href="/starred" class="btn btn-ghost gap-2">
 				<Star size={16} class="text-warning" />
 				Starred
