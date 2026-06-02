@@ -13,15 +13,21 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const openai = new OpenAI({ apiKey: key });
 
+	const prompt = userAnswer
+		? `A student is learning Chinese vocabulary using HSK flashcards. They were asked to type the pinyin (no tone marks) for the English prompt "${english}".
+
+Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}", HSK level: ${hskLevel ?? 'unknown'})
+Typed: "${userAnswer}"
+
+In 2-3 short sentences, help understand the mistake and remember the correct pinyin. Focus on what went wrong (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise.`
+		: `Explain this HSK ${hskLevel ?? ''} Chinese word to help remember it: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
+
+In 2-3 short sentences, give a memorable explanation - cover the meaning, any useful associations, and tips for remembering the pinyin. Be encouraging and concise.`;
+
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
 		store: false,
-		input: `A student is learning Chinese vocabulary using HSK flashcards. They were asked to type the pinyin (no tone marks) for the English prompt "${english}".
-
-Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}", HSK level: ${hskLevel ?? 'unknown'})
-Student typed: "${userAnswer || '(nothing)'}"
-
-In 2-3 short sentences, help the student understand their mistake and remember the correct pinyin. Focus on what tripped them up (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise.`
+		input: prompt
 	});
 
 	const explanation = response.output_text;
