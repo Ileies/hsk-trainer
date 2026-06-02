@@ -5,7 +5,6 @@ import { eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import {
 	getPracticeData,
-	getPracticeTopics,
 	parseNullableInt,
 	parsePositiveIds,
 	serializePracticeWord
@@ -13,16 +12,13 @@ import {
 
 export const load: PageServerLoad = async ({ url }) => {
 	const hsk = parseNullableInt(url.searchParams.get('hsk'));
-	const topic = url.searchParams.get('topic') || null;
 	const excludeIds = parsePositiveIds(url.searchParams.get('exclude'));
 	const lastId = parseNullableInt(url.searchParams.get('last'));
-	const practiceData = await getPracticeData(hsk, topic, excludeIds, lastId);
+	const practiceData = await getPracticeData(hsk, excludeIds, lastId);
 
 	return {
 		...practiceData,
-		hsk,
-		topic,
-		topics: await getPracticeTopics()
+		hsk
 	};
 };
 

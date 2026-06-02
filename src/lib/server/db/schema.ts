@@ -28,7 +28,6 @@ export const vocabulary = sqliteTable(
 		pinyinPlain: text('pinyin_plain').notNull(),
 		english: text('english').notNull(),
 		hskLevel: integer('hsk_level').notNull(),
-		topic: text('topic'),
 		learned: integer('learned', { mode: 'boolean' }).notNull().default(false),
 		learnedAt: integer('learned_at', { mode: 'timestamp' }),
 		starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
@@ -36,7 +35,6 @@ export const vocabulary = sqliteTable(
 	},
 	(table) => ({
 		hskIdx: index('hsk_level_idx').on(table.hskLevel),
-		learnedIdx: index('learned_idx').on(table.learned),
-		topicIdx: index('topic_idx').on(table.topic)
+		learnedIdx: index('learned_idx').on(table.learned)
 	})
 );

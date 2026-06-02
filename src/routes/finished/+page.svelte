@@ -60,9 +60,6 @@
 							<span class="badge {LEVEL_COLORS[word.hskLevel - 1]} badge-sm">
 								HSK {word.hskLevel}
 							</span>
-							{#if word.topic}
-								<span class="badge badge-outline badge-sm capitalize">{word.topic}</span>
-							{/if}
 						</div>
 						<form method="POST" action="?/unlearn" use:enhance>
 							<input type="hidden" name="wordId" value={word.id} />

@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, notInArray, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { vocabulary } from '$lib/server/db/schema';
 
@@ -9,7 +9,6 @@ export type PracticeWord = {
 	pinyinPlain: string;
 	english: string;
 	hskLevel: number;
-	topic: string | null;
 	exampleSentences: string | null;
 	starred: boolean;
 };
@@ -37,26 +36,23 @@ export function serializePracticeWord(word: typeof vocabulary.$inferSelect): Pra
 		pinyinPlain: word.pinyinPlain,
 		english: word.english,
 		hskLevel: word.hskLevel,
-		topic: word.topic,
 		exampleSentences: word.exampleSentences,
 		starred: word.starred
 	};
 }
 
-function buildConditions(hsk: number | null, topic: string | null) {
+function buildConditions(hsk: number | null) {
 	const conds = [eq(vocabulary.learned, false)];
 	if (hsk) conds.push(eq(vocabulary.hskLevel, hsk));
-	if (topic) conds.push(eq(vocabulary.topic, topic));
 	return conds.length === 1 ? conds[0] : and(...conds);
 }
 
 export async function getPracticeData(
 	hsk: number | null,
-	topic: string | null,
 	excludeIds: number[],
 	lastId: number | null
 ) {
-	const baseWhere = buildConditions(hsk, topic);
+	const baseWhere = buildConditions(hsk);
 
 	const softExcludeIds = [...excludeIds, ...(lastId ? [lastId] : [])];
 	let word: typeof vocabulary.$inferSelect | undefined;
@@ -103,16 +99,7 @@ export async function getPracticeData(
 	const [{ total }] = await db
 		.select({ total: sql<number>`count(*)` })
 		.from(vocabulary)
-		.where(
-			hsk || topic
-				? and(
-						...[
-							hsk ? eq(vocabulary.hskLevel, hsk) : undefined,
-							topic ? eq(vocabulary.topic, topic) : undefined
-						].filter(Boolean)
-					)
-				: undefined
-		);
+		.where(hsk ? eq(vocabulary.hskLevel, hsk) : undefined);
 
 	const needsReset = !word && remaining > 0 && excludeIds.length > 0;
 
@@ -125,12 +112,3 @@ export async function getPracticeData(
 	};
 }
 
-export async function getPracticeTopics() {
-	const topics = await db
-		.selectDistinct({ topic: vocabulary.topic })
-		.from(vocabulary)
-		.where(isNotNull(vocabulary.topic))
-		.orderBy(vocabulary.topic);
-
-	return topics.map((t) => t.topic as string);
-}

@@ -19,7 +19,6 @@ async function main() {
 			pinyinPlain: e.pinyin_plain,
 			english: e.english,
 			hskLevel: e.hsk_level,
-			topic: e.topic,
 			exampleSentences: e.example_sentences,
 			learned: false
 		}));

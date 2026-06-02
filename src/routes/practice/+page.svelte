@@ -10,7 +10,6 @@
 		ChevronRight,
 		Eye,
 		ArrowLeft,
-		Tag,
 		Loader,
 		Sparkles,
 		Star,
@@ -32,7 +31,6 @@
 			pinyinPlain: string;
 			english: string;
 			hskLevel: number;
-			topic: string | null;
 			exampleSentences: string | null;
 			starred: boolean;
 		};
@@ -125,6 +123,7 @@
 					pinyin: word.pinyin,
 					pinyinPlain: word.pinyinPlain,
 					english: word.english,
+					hskLevel: word.hskLevel,
 					userAnswer: result?.userAnswer ?? ''
 				})
 			});
@@ -139,7 +138,7 @@
 
 	async function repair() {
 		const word = result?.word ?? currentWord;
-		if (!word || repairing || repaired) return;
+		if (!word || repairing) return;
 		repairing = true;
 		repairError = null;
 		try {
@@ -192,12 +191,11 @@
 		});
 	}
 
-	function setFilter(hsk: number | null, topic: string | null) {
+	function setFilter(hsk: number | null) {
 		seenIds = [];
 		sessionStartTotal = 0;
 		const params = new SvelteURLSearchParams();
 		if (hsk) params.set('hsk', String(hsk));
-		if (topic) params.set('topic', topic);
 		goto(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), {
 			replaceState: true,
 			invalidateAll: true
@@ -205,11 +203,7 @@
 	}
 
 	function toggleHsk(level: number) {
-		setFilter(data.hsk === level ? null : level, data.topic);
-	}
-
-	function toggleTopic(t: string) {
-		setFilter(data.hsk, data.topic === t ? null : t);
+		setFilter(data.hsk === level ? null : level);
 	}
 
 	function buildNextParams(lastId: number | null, newSeenIds: number[]) {
@@ -287,9 +281,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
-	<title
-		>Practice{data.hsk ? ` - HSK ${data.hsk}` : ''}{data.topic ? ` - ${data.topic}` : ''} - HSK Tester</title
-	>
+	<title>Practice{data.hsk ? ` - HSK ${data.hsk}` : ''} - HSK Tester</title>
 </svelte:head>
 
 <!-- Top bar -->
@@ -302,8 +294,8 @@
 	<div class="flex flex-1 flex-wrap justify-start gap-2 sm:justify-center">
 		<!-- HSK level filters -->
 		<button
-			class="btn btn-xs {!data.hsk && !data.topic ? 'btn-primary' : 'btn-ghost'}"
-			onclick={() => setFilter(null, null)}
+			class="btn btn-xs {!data.hsk ? 'btn-primary' : 'btn-ghost'}"
+			onclick={() => setFilter(null)}
 		>
 			All
 		</button>
@@ -336,29 +328,6 @@
 	</div>
 </div>
 
-<!-- Topic filter (shown if topics exist) -->
-{#if data.topics.length > 0}
-	<div class="mb-6 flex flex-wrap items-center gap-2">
-		<Tag size={14} class="text-base-content/40" />
-		<button
-			class="badge {!data.topic ? 'badge-primary' : 'badge-outline'} cursor-pointer capitalize"
-			onclick={() => setFilter(data.hsk, null)}
-		>
-			All topics
-		</button>
-		{#each data.topics as t (t)}
-			<button
-				class="badge {data.topic === t
-					? 'badge-primary'
-					: 'badge-outline'} cursor-pointer capitalize transition-colors hover:badge-primary"
-				onclick={() => toggleTopic(t)}
-			>
-				{t}
-			</button>
-		{/each}
-	</div>
-{/if}
-
 <!-- Progress bar -->
 {#if sessionStartTotal > 0}
 	<div class="mb-6">
@@ -382,13 +351,7 @@
 			<div class="max-w-sm">
 				<div class="mb-4 text-6xl">🎉</div>
 				<h2 class="mb-2 text-2xl font-bold">
-					{data.hsk && data.topic
-						? `HSK ${data.hsk} - "${data.topic}" complete!`
-						: data.hsk
-							? `HSK ${data.hsk} complete!`
-							: data.topic
-								? `"${data.topic}" complete!`
-								: 'All words learned!'}
+					{data.hsk ? `HSK ${data.hsk} complete!` : 'All words learned!'}
 				</h2>
 				<p class="mb-6 text-base-content/60">
 					You've learned all {total} words in this set.
@@ -396,9 +359,9 @@
 				<div class="flex flex-wrap justify-center gap-2">
 					<a href={resolve('/')} class="btn btn-primary">Back to Dashboard</a>
 					{#if data.hsk && data.hsk < 6}
-						<a href={resolve(`/practice?hsk=${data.hsk + 1}`)} class="btn btn-outline">
+						<button class="btn btn-outline" onclick={() => setFilter(data.hsk! + 1)}>
 							Try HSK {data.hsk + 1}
-						</a>
+						</button>
 					{/if}
 				</div>
 			</div>
@@ -453,9 +416,6 @@
 				<span class="badge {LEVEL_COLORS[currentWord.hskLevel - 1]} badge-sm">
 					HSK {currentWord.hskLevel}
 				</span>
-				{#if currentWord.topic}
-					<span class="badge badge-outline badge-sm capitalize">{currentWord.topic}</span>
-				{/if}
 			</div>
 
 			<!-- English prompt -->
@@ -579,10 +539,26 @@
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 							{@html marked.parse(explanation)}
 						</div>
+					{/if}
+
+					<div class="mt-3 flex justify-center gap-2">
 						<button
-							class="btn mt-3 gap-2 self-center btn-outline btn-sm {repaired ? 'btn-success' : ''}"
+							class="btn gap-2 btn-outline btn-sm"
+							onclick={explain}
+							disabled={explaining}
+						>
+							{#if explaining}
+								<Loader size={14} class="animate-spin" />
+								Explaining...
+							{:else}
+								<Sparkles size={14} />
+								Explain
+							{/if}
+						</button>
+						<button
+							class="btn gap-2 btn-outline btn-sm {repaired ? 'btn-success' : ''}"
 							onclick={repair}
-							disabled={repairing || repaired}
+							disabled={repairing}
 						>
 							{#if repairing}
 								<Loader size={14} class="animate-spin" />
@@ -595,23 +571,9 @@
 								Repair flashcard
 							{/if}
 						</button>
-						{#if repairError}
-							<p class="mt-2 text-center text-sm text-error">{repairError}</p>
-						{/if}
-					{:else}
-						<button
-							class="btn mt-3 gap-2 self-center btn-outline btn-sm"
-							onclick={explain}
-							disabled={explaining}
-						>
-							{#if explaining}
-								<Loader size={14} class="animate-spin" />
-								Explaining...
-							{:else}
-								<Sparkles size={14} />
-								Explain
-							{/if}
-						</button>
+					</div>
+					{#if repairError}
+						<p class="mt-2 text-center text-sm text-error">{repairError}</p>
 					{/if}
 
 					<button class="btn mt-3 w-full gap-2 btn-primary" onclick={next} disabled={loading}>
@@ -693,8 +655,8 @@
 
 			{#if result.correct && aiCorrected}
 				<div class="rounded-xl bg-base-100 px-4 py-3 text-center text-sm text-base-content/60">
-					You could have also typed:
-					<span class="ml-1 font-mono text-base-content/80">{result.word.pinyinPlain}</span>
+					You typed:
+					<span class="ml-1 font-mono text-base-content/80">{result.userAnswer}</span>
 				</div>
 			{/if}
 
@@ -725,10 +687,26 @@
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html marked.parse(explanation)}
 					</div>
+				{/if}
+
+				<div class="flex justify-center gap-2">
 					<button
-						class="btn gap-2 self-center btn-outline btn-sm {repaired ? 'btn-success' : ''}"
+						class="btn gap-2 btn-outline btn-sm"
+						onclick={explain}
+						disabled={explaining}
+					>
+						{#if explaining}
+							<Loader size={14} class="animate-spin" />
+							Explaining...
+						{:else}
+							<Sparkles size={14} />
+							Explain
+						{/if}
+					</button>
+					<button
+						class="btn gap-2 btn-outline btn-sm {repaired ? 'btn-success' : ''}"
 						onclick={repair}
-						disabled={repairing || repaired}
+						disabled={repairing}
 					>
 						{#if repairing}
 							<Loader size={14} class="animate-spin" />
@@ -741,23 +719,9 @@
 							Repair flashcard
 						{/if}
 					</button>
-					{#if repairError}
-						<p class="text-center text-sm text-error">{repairError}</p>
-					{/if}
-				{:else}
-					<button
-						class="btn gap-2 self-center btn-outline btn-sm"
-						onclick={explain}
-						disabled={explaining}
-					>
-						{#if explaining}
-							<Loader size={14} class="animate-spin" />
-							Explaining...
-						{:else}
-							<Sparkles size={14} />
-							Explain
-						{/if}
-					</button>
+				</div>
+				{#if repairError}
+					<p class="text-center text-sm text-error">{repairError}</p>
 				{/if}
 			{/if}
 
@@ -766,9 +730,6 @@
 				<span class="badge {LEVEL_COLORS[result.word.hskLevel - 1]} badge-sm">
 					HSK {result.word.hskLevel}
 				</span>
-				{#if result.word.topic}
-					<span class="badge badge-outline badge-sm capitalize">{result.word.topic}</span>
-				{/if}
 			</div>
 
 			<button class="btn gap-2 btn-primary" onclick={next} disabled={loading}>

@@ -4,9 +4,8 @@ import { getPracticeData, parseNullableInt, parsePositiveIds } from '$lib/server
 
 export const GET: RequestHandler = async ({ url }) => {
 	const hsk = parseNullableInt(url.searchParams.get('hsk'));
-	const topic = url.searchParams.get('topic') || null;
 	const excludeIds = parsePositiveIds(url.searchParams.get('exclude'));
 	const lastId = parseNullableInt(url.searchParams.get('last'));
 
-	return json(await getPracticeData(hsk, topic, excludeIds, lastId));
+	return json(await getPracticeData(hsk, excludeIds, lastId));
 };

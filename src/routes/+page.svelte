@@ -6,7 +6,6 @@
 		Zap,
 		ChevronRight,
 		Trophy,
-		Target,
 		Star
 	} from '@lucide/svelte';
 
@@ -149,22 +148,4 @@
 		{/each}
 	</div>
 
-	<!-- Practice by topic -->
-	{#if data.topics.length > 0}
-		<div class="card bg-base-100 shadow-sm mb-8">
-			<div class="card-body">
-				<div class="flex items-center gap-2 mb-3">
-					<Target size={18} class="text-primary" />
-					<h2 class="card-title text-lg">Practice by Topic</h2>
-				</div>
-				<div class="flex flex-wrap gap-2">
-					{#each data.topics as topic}
-						<a href="/practice?topic={encodeURIComponent(topic)}" class="badge badge-outline hover:badge-primary cursor-pointer transition-colors capitalize">
-							{topic}
-						</a>
-					{/each}
-				</div>
-			</div>
-		</div>
-	{/if}
 {/if}

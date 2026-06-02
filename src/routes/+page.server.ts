@@ -14,15 +14,8 @@ export const load: PageServerLoad = async () => {
 		.groupBy(vocabulary.hskLevel)
 		.orderBy(vocabulary.hskLevel);
 
-	const topics = await db
-		.selectDistinct({ topic: vocabulary.topic })
-		.from(vocabulary)
-		.where(sql`${vocabulary.topic} is not null`)
-		.orderBy(vocabulary.topic);
-
 	return {
-		stats,
-		topics: topics.map((t) => t.topic as string)
+		stats
 	};
 };
 

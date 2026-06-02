@@ -8,7 +8,6 @@
 		BookOpen,
 		CheckCircle,
 		GraduationCap,
-		Tag,
 		MessageSquare
 	} from '@lucide/svelte';
 
@@ -121,12 +120,6 @@
 							<GraduationCap size={12} />
 							HSK {data.word.hskLevel}
 						</span>
-						{#if data.word.topic}
-							<span class="badge badge-outline badge-md gap-1 capitalize">
-								<Tag size={11} />
-								{data.word.topic}
-							</span>
-						{/if}
 						{#if data.word.learned}
 							<span class="badge badge-success badge-md gap-1">
 								<CheckCircle size={12} />
@@ -271,9 +264,6 @@
 								<span class="badge {LEVEL_COLORS[word.hskLevel - 1]} badge-sm">
 									HSK {word.hskLevel}
 								</span>
-								{#if word.topic}
-									<span class="badge badge-outline badge-sm capitalize">{word.topic}</span>
-								{/if}
 							</div>
 							<div class="flex gap-1.5 shrink-0">
 								{#if word.starred}
