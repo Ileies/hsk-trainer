@@ -9,21 +9,21 @@ export const POST: RequestHandler = async ({ request }) => {
 	const key = env.OPENAI_KEY;
 	if (!key) throw error(500, 'OPENAI_KEY is not configured');
 
-	const { wordId, hanzi, pinyin, pinyinPlain, english, userAnswer } = await request.json();
+	const { wordId, hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer } = await request.json();
 
 	const openai = new OpenAI({ apiKey: key });
 
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
 		store: false,
-		input: `A student is learning Chinese vocabulary using HSK flashcards. They were asked to translate the English word "${english}" into pinyin (without tone marks).
+		input: `A student is learning Chinese vocabulary using HSK flashcards. They were asked to type the pinyin (no tone marks) for the English prompt "${english}".
 
-Correct answer: "${pinyinPlain}" (with tones: "${pinyin}", Chinese: "${hanzi}")
+Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}")
 Student typed: "${userAnswer || '(nothing)'}"
 
-The app's vocabulary data was AI-generated, so be critical of it too: if the English prompt, Chinese word, or pinyin seems wrong or ambiguous, say so briefly instead of assuming the student is wrong.
+First, verify the flashcard data independently of what the student typed: does "${english}" accurately describe the primary standalone meaning of "${hanzi}" (${pinyin})? Only flag an issue if the English is clearly wrong on its own - e.g. garbled/placeholder text, or a meaning that belongs to a completely different word. Do NOT flag it just because the student confused this word with another word - their confusion is not evidence of a flashcard error. Minor phrasing differences (e.g. "a time, a moment" vs "time; moment") are not errors. If and only if the English is genuinely wrong, begin your response with exactly: "Flashcard issue: the English should be '[correct meaning here]'." — then continue.
 
-In 2-3 short sentences, explain: why the student's answer was wrong (if it reveals a likely confusion), and give a simple tip to remember the correct pinyin for this word. Be encouraging and concise.`
+In 2-3 short sentences total, explain why the student's answer was wrong (if it reveals a likely confusion) and give a simple tip to remember the correct pinyin. Be encouraging and concise.`
 	});
 
 	const explanation = response.output_text;

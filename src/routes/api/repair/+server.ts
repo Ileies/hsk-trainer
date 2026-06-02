@@ -17,22 +17,21 @@ export const POST: RequestHandler = async ({ request }) => {
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
 		store: false,
-		input: `You are correcting the English translation on an HSK Chinese flashcard. The AI explanation below flagged a potential error.
+		input: `You are writing the English translation for an HSK Chinese flashcard.
 
 Card:
 - Hanzi: ${hanzi}
 - Pinyin: ${pinyin}
-- Current English: ${english}
 
-Explanation that flagged issues: "${explanation}"
+Write a concise dictionary-style translation for this specific word as it appears on its own (not in compounds).
 
-Formatting rules for the English translation:
-- Keep it concise, like a dictionary entry (e.g. "to love", "big", "Beijing")
-- For multiple meanings or alternatives, separate them with a comma and space (e.g. "to sit, to be seated"). Never use "or", angle brackets, slashes, or semicolons between alternatives.
+Formatting rules:
+- Include only the 1-3 most important standalone meanings. Drop rare, compound-only, or redundant senses.
+- Separate meanings with a comma and space (e.g. "to sit, to be seated"). Never use "or", angle brackets, slashes, semicolons, or curly braces.
 - Use "to" before verbs (e.g. "to eat", "to go")
 - Do not use parentheses for core meanings; parentheses are only for brief grammatical notes (e.g. "(negative prefix)")
 
-Output ONLY a valid JSON object with a single key "english" containing the corrected English translation. No explanation, no markdown, no extra text.`
+Output ONLY a valid JSON object with a single key "english".`
 	});
 
 	let corrected: { english: string };
