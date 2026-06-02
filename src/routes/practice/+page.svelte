@@ -202,10 +202,6 @@
 		});
 	}
 
-	function toggleHsk(level: number) {
-		setFilter(data.hsk === level ? null : level);
-	}
-
 	function buildNextParams(lastId: number | null, newSeenIds: number[]) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
 		params.delete('exclude');
@@ -291,22 +287,10 @@
 		Dashboard
 	</a>
 
-	<div class="flex flex-1 flex-wrap justify-start gap-2 sm:justify-center">
-		<!-- HSK level filters -->
-		<button
-			class="btn btn-xs {!data.hsk ? 'btn-primary' : 'btn-ghost'}"
-			onclick={() => setFilter(null)}
-		>
-			All
-		</button>
-		{#each [1, 2, 3, 4, 5, 6] as level (level)}
-			<button
-				class="btn btn-xs {data.hsk === level ? 'btn-primary' : 'btn-ghost'}"
-				onclick={() => toggleHsk(level)}
-			>
-				HSK {level}
-			</button>
-		{/each}
+	<div class="flex flex-1 justify-start sm:justify-center">
+		<span class="text-sm font-semibold text-base-content/70">
+			{data.hsk ? `HSK ${data.hsk}` : 'All levels'}
+		</span>
 	</div>
 
 	<div class="flex flex-col items-end gap-1 self-start sm:self-center">
