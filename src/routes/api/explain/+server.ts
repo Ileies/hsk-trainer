@@ -19,10 +19,10 @@ export const POST: RequestHandler = async ({ request }) => {
 Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}", HSK level: ${hskLevel ?? 'unknown'})
 Typed: "${userAnswer}"
 
-In 2-3 short sentences, help understand the mistake and remember the correct pinyin. Focus on what went wrong (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise.`
+In 2-3 short sentences, help understand the mistake and remember the correct pinyin. Focus on what went wrong (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise. Then add two example sentences using this word, each on its own line, in the format: *pinyin with tones* - English translation.`
 		: `Explain this HSK ${hskLevel ?? ''} Chinese word to help remember it: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
 
-In 2-3 short sentences, give a memorable explanation - cover the meaning, any useful associations, and tips for remembering the pinyin. Be encouraging and concise.`;
+In 2-3 short sentences, give a memorable explanation - cover the meaning, any useful associations, and tips for remembering the pinyin. Be encouraging and concise. Then add two example sentences using this word, each on its own line, in the format: *pinyin with tones* - English translation.`;
 
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
