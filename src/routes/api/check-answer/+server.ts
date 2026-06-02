@@ -49,7 +49,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (dist <= 2 && maxLen >= 8) return accept();
 
 	// Clearly too far off - skip the AI call
-	if (ratio > 0.5) return json({ valid: 1, reason: null });
+	if (ratio >= 0.5) return json({ valid: 1, reason: null });
 
 	// Borderline: let the AI decide
 	const openai = new OpenAI({ apiKey: key });
@@ -66,7 +66,7 @@ Correct: ${correct}
 Typed: ${typed}
 
 Is this a typo (student clearly knows the word) or a genuine pinyin mistake?
-Reply "0" for a typo. Otherwise a short reason under 8 words. No prefix. When in doubt, reply "0".`
+Reply "0" if it's clearly a typo (student knows the word). Otherwise a short reason under 8 words. No prefix.`
 	});
 
 	const text = (response.output_text ?? '').trim();
