@@ -3,6 +3,17 @@
 	themes: nord --default, dim --dark;
 }
 
+@layer utilities {
+	@media (max-width: 767px) {
+		.mobile-content-pb {
+			padding-bottom: 5rem;
+		}
+		.mobile-content-pb-dashboard {
+			padding-bottom: 8.5rem;
+		}
+	}
+}
+
 @layer base {
 	.hanzi {
 		font-family:

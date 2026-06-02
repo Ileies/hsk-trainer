@@ -2,12 +2,13 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { BookOpen, Sparkles, Settings, Search, Network } from '@lucide/svelte';
+	import { BookOpen, Sparkles, Settings, Search, Network, Home } from '@lucide/svelte';
 	import MapCanvas from '$lib/MapCanvas.svelte';
 
 	let { children, data } = $props();
 
 	let isMap = $derived(page.url.pathname === '/map');
+	let isDashboard = $derived(page.url.pathname === '/');
 
 	let searchQuery = $state('');
 	let dropdown = $state<
@@ -85,8 +86,9 @@
 	}
 </script>
 
-<div class="h-screen flex flex-col bg-base-200">
-	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0">
+<div class="h-dvh flex flex-col bg-base-200">
+	<!-- Desktop header (hidden on mobile) -->
+	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0 hidden md:flex">
 		<div class="flex-none">
 			<a href="/" class="flex items-center gap-2 text-xl font-bold text-primary">
 				<BookOpen size={24} />
@@ -94,7 +96,6 @@
 			</a>
 		</div>
 
-		<!-- Search field - centered -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="relative flex-1 flex justify-center px-4"
@@ -164,7 +165,7 @@
 			<a
 				href="/"
 				class="btn btn-ghost btn-sm hidden sm:inline-flex"
-				class:btn-active={page.url.pathname === '/'}
+				class:btn-active={isDashboard}
 			>
 				Dashboard
 			</a>
@@ -203,7 +204,7 @@
 	</nav>
 
 	<!-- Map canvas - always mounted so it survives route changes -->
-	<div class="{isMap ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden">
+	<div class="{isMap ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
 		<MapCanvas words={data.words} />
 	</div>
 
@@ -211,9 +212,123 @@
 		{@render children()}
 	{:else}
 		<main class="flex-1 overflow-auto">
-			<div class="container mx-auto px-4 py-8 max-w-5xl">
+			<div
+				class="container mx-auto px-4 py-8 max-w-5xl"
+				class:mobile-content-pb={!isDashboard}
+				class:mobile-content-pb-dashboard={isDashboard}
+			>
 				{@render children()}
 			</div>
 		</main>
 	{/if}
+
+	<!-- Mobile search bar - only on dashboard, pinned above bottom nav -->
+	{#if isDashboard}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="fixed bottom-16 inset-x-0 bg-base-100 border-t border-base-200 px-4 py-2 z-40 md:hidden"
+			onfocusout={onFocusOut}
+		>
+			<div class="relative">
+				<label class="input input-sm flex items-center gap-2 w-full">
+					<Search size={14} class="text-base-content/40 shrink-0" />
+					<input
+						bind:value={searchQuery}
+						oninput={onSearchInput}
+						onkeydown={onSearchKeydown}
+						onfocus={() => {
+							if (dropdown.length > 0) showDropdown = true;
+						}}
+						type="text"
+						placeholder="Search..."
+						class="grow min-w-0"
+						autocomplete="off"
+						autocapitalize="off"
+						spellcheck="false"
+					/>
+				</label>
+
+				{#if showDropdown}
+					<div
+						class="absolute bottom-full mb-1.5 left-0 right-0 bg-base-100 shadow-2xl rounded-2xl z-50 border border-base-200 overflow-hidden"
+					>
+						{#each dropdown as word}
+							<button
+								class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors text-left"
+								onpointerdown={(e) => {
+									e.preventDefault();
+									selectWord(word.id);
+								}}
+							>
+								<span class="hanzi text-2xl font-bold leading-none text-primary shrink-0">
+									{word.hanzi}
+								</span>
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-1.5">
+										<span class="text-sm font-medium text-base-content/80 truncate">
+											{word.pinyin}
+										</span>
+										<span class="badge badge-xs badge-ghost shrink-0">HSK {word.hskLevel}</span>
+									</div>
+									<div class="text-xs text-base-content/50 truncate">{word.english}</div>
+								</div>
+							</button>
+						{/each}
+
+						<button
+							class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-t border-base-200 text-sm text-primary hover:bg-base-200 transition-colors font-medium"
+							onpointerdown={(e) => {
+								e.preventDefault();
+								viewAll();
+							}}
+						>
+							<Search size={13} />
+							View all results for "{searchQuery.trim()}"
+						</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Mobile bottom navigation -->
+	<nav class="fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-200 z-50 md:hidden">
+		<div class="flex h-16">
+			<a
+				href="/"
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {isDashboard ? 'text-primary' : 'text-base-content/40'}"
+			>
+				<Home size={22} />
+				<span class="text-xs">Dashboard</span>
+			</a>
+			<a
+				href="/explains"
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/explains') ? 'text-primary' : 'text-base-content/40'}"
+			>
+				<Sparkles size={22} />
+				<span class="text-xs">Explains</span>
+			</a>
+			<a
+				href="/map"
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname === '/map' ? 'text-primary' : 'text-base-content/40'}"
+			>
+				<Network size={22} />
+				<span class="text-xs">Map</span>
+			</a>
+			<a
+				href="/practice"
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/practice') ? 'text-primary' : 'text-base-content/40'}"
+			>
+				<BookOpen size={22} />
+				<span class="text-xs">Practice</span>
+			</a>
+			<a
+				href="/settings"
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/settings') ? 'text-primary' : 'text-base-content/40'}"
+			>
+				<Settings size={22} />
+				<span class="text-xs">Settings</span>
+			</a>
+		</div>
+	</nav>
 </div>
