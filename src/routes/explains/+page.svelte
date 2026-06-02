@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>Saved Explanations - HSK Tester</title>
+	<title>Saved Explanations - HSK Trainer</title>
 </svelte:head>
 
 <div class="flex items-center justify-between mb-8">

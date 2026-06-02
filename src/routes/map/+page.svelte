@@ -1,3 +1,3 @@
 <svelte:head>
-	<title>Word Map - HSK Tester</title>
+	<title>Word Map - HSK Trainer</title>
 </svelte:head>

@@ -1,4 +1,4 @@
-# HSK Tester - Project Guide
+# HSK Trainer - Project Guide
 
 ## What this is
 

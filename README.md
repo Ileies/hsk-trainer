@@ -1,4 +1,4 @@
-# HSK Tester
+# HSK Trainer
 
 A self-hosted flashcard web app for learning Chinese vocabulary from the official HSK (Hanyu Shuiping Kaoshi) word lists. Covers all six HSK levels (~5,000 words) with AI-assisted grading, interactive word maps, and per-level progress tracking.
 

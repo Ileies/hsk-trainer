@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>HSK Tester - Dashboard</title>
+	<title>HSK Trainer - Dashboard</title>
 </svelte:head>
 
 {#if data.stats.length === 0}

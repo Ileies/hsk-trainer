@@ -69,11 +69,11 @@
 
 <svelte:head>
 	{#if data.mode === 'detail'}
-		<title>{data.word.hanzi} - {data.word.english} - HSK Tester</title>
+		<title>{data.word.hanzi} - {data.word.english} - HSK Trainer</title>
 	{:else if data.q}
-		<title>Search: {data.q} - HSK Tester</title>
+		<title>Search: {data.q} - HSK Trainer</title>
 	{:else}
-		<title>Search - HSK Tester</title>
+		<title>Search - HSK Trainer</title>
 	{/if}
 </svelte:head>
 

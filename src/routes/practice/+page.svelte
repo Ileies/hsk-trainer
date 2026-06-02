@@ -281,7 +281,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
-	<title>Practice{data.hsk ? ` - HSK ${data.hsk}` : ''} - HSK Tester</title>
+	<title>Practice{data.hsk ? ` - HSK ${data.hsk}` : ''} - HSK Trainer</title>
 </svelte:head>
 
 <!-- Top bar -->

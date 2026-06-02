@@ -8,7 +8,7 @@
 </script>
 
 <svelte:head>
-	<title>HSK Tester - Settings</title>
+	<title>HSK Trainer - Settings</title>
 </svelte:head>
 
 <div class="max-w-2xl mx-auto">

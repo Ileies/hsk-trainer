@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>{title} - HSK Tester</title>
+	<title>{title} - HSK Trainer</title>
 </svelte:head>
 
 <div class="flex items-center gap-3 mb-6">

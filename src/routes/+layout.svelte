@@ -90,7 +90,7 @@
 		<div class="flex-none">
 			<a href="/" class="flex items-center gap-2 text-xl font-bold text-primary">
 				<BookOpen size={24} />
-				<span class="hidden sm:inline">HSK Tester</span>
+				<span class="hidden sm:inline">HSK Trainer</span>
 			</a>
 		</div>
 

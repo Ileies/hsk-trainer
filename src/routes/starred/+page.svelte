@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Starred Words - HSK Tester</title>
+	<title>Starred Words - HSK Trainer</title>
 </svelte:head>
 
 <div class="flex items-center gap-3 mb-6">
