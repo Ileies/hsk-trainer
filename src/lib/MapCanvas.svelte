@@ -71,6 +71,10 @@
 	let hasDragged = false;
 	let dragLast = { x: 0, y: 0 };
 
+	// Multi-touch / pinch state
+	let activePointers = new Map<number, { x: number; y: number }>();
+	let lastPinchDist = 0;
+
 	// Map-local search
 	let mapSearch = $state('');
 	let mapDropdown = $state<
@@ -289,14 +293,51 @@
 	}
 
 	function onPointerDown(e: PointerEvent) {
-		if (e.button !== 0) return;
-		isDragging = true;
-		hasDragged = false;
-		dragLast = { x: e.clientX, y: e.clientY };
+		if (e.pointerType === 'mouse' && e.button !== 0) return;
+		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+		if (activePointers.size >= 2) {
+			isDragging = false;
+			const pts = [...activePointers.values()];
+			lastPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+		} else {
+			isDragging = true;
+			hasDragged = false;
+			dragLast = { x: e.clientX, y: e.clientY };
+		}
 	}
 
 	function onPointerMove(e: PointerEvent) {
+		activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+		if (activePointers.size >= 2) {
+			const pts = [...activePointers.values()];
+			const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+			if (lastPinchDist > 0 && dist > 0) {
+				const factor = dist / lastPinchDist;
+				const midClientX = (pts[0].x + pts[1].x) / 2;
+				const midClientY = (pts[0].y + pts[1].y) / 2;
+				const rect = canvas!.getBoundingClientRect();
+				const cx = (midClientX - rect.left) * devicePixelRatio;
+				const cy = (midClientY - rect.top) * devicePixelRatio;
+				const newScale = Math.max(minScale, Math.min(6, cam.scale * factor));
+				const ratio = newScale / cam.scale;
+				const rawX = cx - (cx - cam.x) * ratio;
+				const rawY = cy - (cy - cam.y) * ratio;
+				const clamped = clampCamPos(rawX, rawY, newScale);
+				cam.x = clamped.x;
+				cam.y = clamped.y;
+				cam.scale = newScale;
+				camTarget.x = cam.x;
+				camTarget.y = cam.y;
+				camTarget.scale = cam.scale;
+			}
+			lastPinchDist = dist;
+			hasDragged = true;
+			return;
+		}
+
 		if (isDragging) {
 			const dx = (e.clientX - dragLast.x) * devicePixelRatio;
 			const dy = (e.clientY - dragLast.y) * devicePixelRatio;
@@ -317,6 +358,19 @@
 	}
 
 	function onPointerUp(e: PointerEvent) {
+		activePointers.delete(e.pointerId);
+
+		if (activePointers.size === 1) {
+			// One finger lifted during pinch - resume single-finger drag
+			lastPinchDist = 0;
+			const [, pos] = [...activePointers.entries()][0];
+			isDragging = true;
+			hasDragged = true; // prevent accidental tap-focus after pinch
+			dragLast = { x: pos.x, y: pos.y };
+			return;
+		}
+
+		lastPinchDist = 0;
 		if (!isDragging) return;
 		isDragging = false;
 		if (!hasDragged) {
@@ -328,7 +382,18 @@
 		}
 	}
 
+	function onPointerCancel(e: PointerEvent) {
+		activePointers.delete(e.pointerId);
+		if (activePointers.size === 0) {
+			isDragging = false;
+			lastPinchDist = 0;
+		}
+		hoverNode = null;
+	}
+
 	function onPointerLeave() {
+		activePointers.clear();
+		lastPinchDist = 0;
 		isDragging = false;
 		hoverNode = null;
 	}
@@ -680,6 +745,7 @@
 			onpointerdown={onPointerDown}
 			onpointermove={onPointerMove}
 			onpointerup={onPointerUp}
+			onpointercancel={onPointerCancel}
 			onpointerleave={onPointerLeave}
 		></canvas>
 
@@ -707,7 +773,7 @@
 		<div
 			class="absolute bottom-4 right-4 bg-base-100/80 backdrop-blur-sm rounded-xl p-2 text-xs text-base-content/40 pointer-events-none"
 		>
-			Click: focus &nbsp; Scroll: zoom &nbsp; Drag: pan
+			Tap: focus &nbsp; Pinch/Scroll: zoom &nbsp; Drag: pan
 		</div>
 	</div>
 </div>
