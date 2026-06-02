@@ -18,12 +18,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		store: false,
 		input: `A student is learning Chinese vocabulary using HSK flashcards. They were asked to type the pinyin (no tone marks) for the English prompt "${english}".
 
-Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}")
+Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}", HSK level: ${hskLevel ?? 'unknown'})
 Student typed: "${userAnswer || '(nothing)'}"
 
-First, verify the flashcard data independently of what the student typed: does "${english}" accurately describe the primary standalone meaning of "${hanzi}" (${pinyin})? Only flag an issue if the English is clearly wrong on its own - e.g. garbled/placeholder text, or a meaning that belongs to a completely different word. Do NOT flag it just because the student confused this word with another word - their confusion is not evidence of a flashcard error. Minor phrasing differences (e.g. "a time, a moment" vs "time; moment") are not errors. If and only if the English is genuinely wrong, begin your response with exactly: "Flashcard issue: the English should be '[correct meaning here]'." — then continue.
-
-In 2-3 short sentences total, explain why the student's answer was wrong (if it reveals a likely confusion) and give a simple tip to remember the correct pinyin. Be encouraging and concise.`
+In 2-3 short sentences, help the student understand their mistake and remember the correct pinyin. Focus on what tripped them up (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise.`
 	});
 
 	const explanation = response.output_text;
