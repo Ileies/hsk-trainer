@@ -11,23 +11,6 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const LEVEL_COLORS = [
-		'badge-primary',
-		'badge-secondary',
-		'badge-accent',
-		'badge-warning',
-		'badge-error',
-		'badge-neutral'
-	];
-
-	const PROGRESS_COLORS = [
-		'progress-primary',
-		'progress-secondary',
-		'progress-accent',
-		'progress-warning',
-		'progress-error',
-		'progress-neutral'
-	];
 
 	const totalWords = $derived(data.stats.reduce((sum, s) => sum + s.total, 0));
 	const totalLearned = $derived(data.stats.reduce((sum, s) => sum + (s.learned ?? 0), 0));
@@ -98,7 +81,7 @@
 
 	<!-- Per-level cards -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-		{#each data.stats as stat, i}
+		{#each data.stats as stat}
 			{@const learned = stat.learned ?? 0}
 			{@const remaining = stat.total - learned}
 			{@const pct = Math.round((learned / stat.total) * 100)}
@@ -109,11 +92,11 @@
 							<GraduationCap size={18} class="text-base-content/60" />
 							<span class="font-bold text-lg">HSK {stat.hskLevel}</span>
 						</div>
-						<span class="badge {LEVEL_COLORS[i]} badge-sm">{pct}%</span>
+						<span class="badge badge-primary badge-sm">{pct}%</span>
 					</div>
 
 					<progress
-						class="progress {PROGRESS_COLORS[i]} w-full"
+						class="progress progress-primary w-full"
 						value={learned}
 						max={stat.total}
 					></progress>
