@@ -1,0 +1,219 @@
+<script lang="ts">
+	import './layout.css';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { BookOpen, Sparkles, Settings, Search, Network } from '@lucide/svelte';
+	import MapCanvas from '$lib/MapCanvas.svelte';
+
+	let { children, data } = $props();
+
+	let isMap = $derived(page.url.pathname === '/map');
+
+	let searchQuery = $state('');
+	let dropdown = $state<
+		{
+			id: number;
+			hanzi: string;
+			pinyin: string;
+			english: string;
+			hskLevel: number;
+		}[]
+	>([]);
+	let showDropdown = $state(false);
+	let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+	let searchInput: HTMLInputElement | undefined = $state();
+
+	$effect(() => {
+		page.url.pathname;
+		searchQuery = '';
+		dropdown = [];
+		showDropdown = false;
+	});
+
+	async function onSearchInput() {
+		const q = searchQuery.trim();
+		if (searchDebounce) clearTimeout(searchDebounce);
+		if (!q) {
+			dropdown = [];
+			showDropdown = false;
+			return;
+		}
+		searchDebounce = setTimeout(async () => {
+			try {
+				const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=6`);
+				const data = await res.json();
+				dropdown = data;
+				showDropdown = data.length > 0;
+			} catch {
+				dropdown = [];
+				showDropdown = false;
+			}
+		}, 250);
+	}
+
+	function onSearchKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && searchQuery.trim()) {
+			e.preventDefault();
+			showDropdown = false;
+			goto(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+		} else if (e.key === 'Escape') {
+			showDropdown = false;
+			searchInput?.blur();
+		}
+	}
+
+	function selectWord(id: number) {
+		showDropdown = false;
+		const q = searchQuery.trim();
+		const params = new URLSearchParams();
+		params.set('id', String(id));
+		if (q) params.set('q', q);
+		goto(`/search?${params}`);
+	}
+
+	function viewAll() {
+		showDropdown = false;
+		goto(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+	}
+
+	function onFocusOut(e: FocusEvent) {
+		const related = e.relatedTarget as HTMLElement | null;
+		if (related && (e.currentTarget as HTMLElement).contains(related)) return;
+		setTimeout(() => {
+			showDropdown = false;
+		}, 150);
+	}
+</script>
+
+<div class="h-screen flex flex-col bg-base-200">
+	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0">
+		<div class="flex-none">
+			<a href="/" class="flex items-center gap-2 text-xl font-bold text-primary">
+				<BookOpen size={24} />
+				<span class="hidden sm:inline">HSK Tester</span>
+			</a>
+		</div>
+
+		<!-- Search field - centered -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="relative flex-1 flex justify-center px-4"
+			onfocusout={onFocusOut}
+		>
+			<label class="input input-sm flex items-center gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
+				<Search size={14} class="text-base-content/40 shrink-0" />
+				<input
+					bind:this={searchInput}
+					bind:value={searchQuery}
+					oninput={onSearchInput}
+					onkeydown={onSearchKeydown}
+					onfocus={() => {
+						if (dropdown.length > 0) showDropdown = true;
+					}}
+					type="text"
+					placeholder="Search..."
+					class="grow min-w-0"
+					autocomplete="off"
+					autocapitalize="off"
+					spellcheck="false"
+				/>
+			</label>
+
+			{#if showDropdown}
+				<div
+					class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 bg-base-100 shadow-2xl rounded-2xl z-50 w-80 sm:w-96 border border-base-200 overflow-hidden"
+				>
+					{#each dropdown as word}
+						<button
+							class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors text-left"
+							onpointerdown={(e) => {
+								e.preventDefault();
+								selectWord(word.id);
+							}}
+						>
+							<span class="hanzi text-2xl font-bold leading-none text-primary shrink-0">
+								{word.hanzi}
+							</span>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-1.5">
+									<span class="text-sm font-medium text-base-content/80 truncate">
+										{word.pinyin}
+									</span>
+									<span class="badge badge-xs badge-ghost shrink-0">HSK {word.hskLevel}</span>
+								</div>
+								<div class="text-xs text-base-content/50 truncate">{word.english}</div>
+							</div>
+						</button>
+					{/each}
+
+					<button
+						class="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-t border-base-200 text-sm text-primary hover:bg-base-200 transition-colors font-medium"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							viewAll();
+						}}
+					>
+						<Search size={13} />
+						View all results for "{searchQuery.trim()}"
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<div class="flex-none gap-1 sm:gap-2">
+			<a
+				href="/"
+				class="btn btn-ghost btn-sm hidden sm:inline-flex"
+				class:btn-active={page.url.pathname === '/'}
+			>
+				Dashboard
+			</a>
+			<a
+				href="/explains"
+				class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"
+				class:btn-active={page.url.pathname.startsWith('/explains')}
+			>
+				<Sparkles size={14} />
+				Explains
+			</a>
+			<a
+				href="/map"
+				class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"
+				class:btn-active={page.url.pathname === '/map'}
+			>
+				<Network size={14} />
+				Map
+			</a>
+			<a
+				href="/practice"
+				class="btn btn-primary btn-sm"
+				class:btn-active={page.url.pathname.startsWith('/practice')}
+			>
+				Practice
+			</a>
+			<a
+				href="/settings"
+				class="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-base-content"
+				class:btn-active={page.url.pathname.startsWith('/settings')}
+				title="Settings"
+			>
+				<Settings size={16} />
+			</a>
+		</div>
+	</nav>
+
+	<!-- Map canvas - always mounted so it survives route changes -->
+	<div class="{isMap ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden">
+		<MapCanvas words={data.words} />
+	</div>
+
+	{#if isMap}
+		{@render children()}
+	{:else}
+		<main class="flex-1 overflow-auto">
+			<div class="container mx-auto px-4 py-8 max-w-5xl">
+				{@render children()}
+			</div>
+		</main>
+	{/if}
+</div>

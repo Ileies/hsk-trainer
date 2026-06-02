@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+@plugin 'daisyui' {
+	themes: nord --default, dim --dark;
+}
+
+@layer base {
+	.hanzi {
+		font-family:
+			'Noto Serif CJK SC',
+			'Source Han Serif SC',
+			'STSong',
+			'SimSun',
+			serif;
+	}
+
+	.explanation-md strong {
+		font-weight: 600;
+	}
+	.explanation-md em {
+		font-style: italic;
+	}
+	.explanation-md p {
+		margin-bottom: 0.5rem;
+	}
+	.explanation-md p:last-child {
+		margin-bottom: 0;
+	}
+	.explanation-md ul,
+	.explanation-md ol {
+		padding-left: 1.25rem;
+		margin-bottom: 0.5rem;
+	}
+	.explanation-md ul {
+		list-style-type: disc;
+	}
+	.explanation-md ol {
+		list-style-type: decimal;
+	}
+	.explanation-md code {
+		font-family: monospace;
+		background: oklch(var(--b2));
+		padding: 0.1em 0.3em;
+		border-radius: 0.25rem;
+	}
+}
