@@ -141,6 +141,12 @@ bun run check
 bun run dev
 ```
 
+**Deploy to production:**
+```bash
+bun run build && bun run deploy
+```
+Compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), and restarts via PM2. Configured in `scripts/deploy.ts`.
+
 **Inspect the database:**
 ```bash
 bun run db:studio

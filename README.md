@@ -90,6 +90,7 @@ Open [http://localhost:5173](http://localhost:5173).
 | `bun run db:push` | Push schema changes to the database |
 | `bun run db:seed` | Import HSK CSV files into the database |
 | `bun run db:studio` | Open Drizzle Studio (visual DB browser) |
+| `bun run deploy` | Deploy to the production server via SSH |
 
 ## Project Structure
 
@@ -127,16 +128,16 @@ static/
 
 ## Production Deployment
 
-Build and run the standalone server:
+Build and deploy to the remote server in one step:
 
 ```bash
 bun run build
-node build/index.js
-# or:
-bun build/index.js
+bun run deploy
 ```
 
-Set the `DATABASE_URL` and `OPENAI_KEY` environment variables in production. The SQLite file is the only persistent state; back it up to preserve study progress.
+`deploy` compresses the `build/` output and `.env` into an archive, uploads it via `scp` to `ros:/var/www/hsk-trainer`, extracts it there (preserving `local.db`), and restarts the app with PM2.
+
+The SQLite file is the only persistent state; back it up to preserve study progress.
 
 ## License
 

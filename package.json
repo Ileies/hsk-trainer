@@ -18,7 +18,8 @@
 		"db:generate": "bun --bun drizzle-kit generate",
 		"db:migrate": "bun --bun drizzle-kit migrate",
 		"db:studio": "bun --bun drizzle-kit studio",
-		"db:seed": "bun scripts/seed.ts"
+		"db:seed": "bun scripts/seed.ts",
+		"deploy": "bun scripts/deploy.ts"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.1.0",
