@@ -87,12 +87,19 @@ function buildWrongPrompt(
 	const level = hskLevel ?? 3;
 	const errorType = classifyError(pinyinPlain, userAnswer);
 
-	const errorHint: Record<ErrorType, string> = {
+	if (errorType === 'different') {
+		return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}".
+
+The student typed a completely different word. In 3-4 sentences: (1) identify what "${userAnswer}" means and why it doesn't fit this prompt, (2) explain what makes "${pinyinPlain}" the right word, (3) if they are near-synonyms, clearly highlight the distinction. Use only pinyin (no hanzi). Be encouraging.
+
+Then one example sentence for "${pinyinPlain}" and one for "${userAnswer}" to contrast usage, each on its own line: *pinyin with tones* - English translation.`;
+	}
+
+	const errorHint: Record<Exclude<ErrorType, 'different'>, string> = {
 		close_typo: 'The student was very close - only a small spelling difference.',
 		transposition: 'The student had the right syllables but in the wrong order.',
 		wrong_syllable_count: `The student typed ${userAnswer.trim().split(/\s+/).length} syllable(s); the correct answer has ${pinyinPlain.trim().split(/\s+/).length}.`,
-		partial: 'The student partially remembered the pinyin.',
-		different: 'The student typed something quite different from the correct answer.'
+		partial: 'The student partially remembered the pinyin.'
 	};
 
 	return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}". ${errorHint[errorType]}
