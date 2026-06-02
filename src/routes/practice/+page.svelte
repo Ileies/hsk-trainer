@@ -192,6 +192,13 @@
 
 	function buildNextParams(lastId: number | null, newSeenIds: number[]) {
 		const params = new SvelteURLSearchParams(page.url.searchParams);
+		// Always reflect the session's hsk filter - the URL may have lost it
+		// (e.g. after navigating back via the plain /practice nav link)
+		if (practiceSession.hsk) {
+			params.set('hsk', String(practiceSession.hsk));
+		} else {
+			params.delete('hsk');
+		}
 		params.delete('exclude');
 		params.delete('last');
 		if (newSeenIds.length > 0) params.set('exclude', newSeenIds.join(','));
