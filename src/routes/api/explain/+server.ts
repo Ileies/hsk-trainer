@@ -5,24 +5,115 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { explains } from '$lib/server/db/schema';
 
+function levenshtein(a: string, b: string): number {
+	const m = a.length, n = b.length;
+	const dp = Array.from({ length: m + 1 }, (_, i) =>
+		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+	);
+	for (let i = 1; i <= m; i++)
+		for (let j = 1; j <= n; j++)
+			dp[i][j] =
+				a[i - 1] === b[j - 1]
+					? dp[i - 1][j - 1]
+					: 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+	return dp[m][n];
+}
+
+type ErrorType = 'close_typo' | 'transposition' | 'wrong_syllable_count' | 'partial' | 'different';
+
+function classifyError(correct: string, typed: string): ErrorType {
+	const correctSyls = correct.trim().split(/\s+/);
+	const typedSyls = typed.trim().split(/\s+/);
+
+	if (correctSyls.length !== typedSyls.length) return 'wrong_syllable_count';
+	if ([...correctSyls].sort().join('|') === [...typedSyls].sort().join('|')) return 'transposition';
+
+	const dist = levenshtein(correct.replace(/\s/g, ''), typed.replace(/\s/g, ''));
+	const ratio = dist / Math.max(correct.replace(/\s/g, '').length, typed.replace(/\s/g, '').length);
+	if (ratio <= 0.25) return 'close_typo';
+	if (ratio <= 0.6) return 'partial';
+	return 'different';
+}
+
+function buildBlankPrompt(
+	hanzi: string,
+	pinyin: string,
+	pinyinPlain: string,
+	english: string,
+	hskLevel: number | null
+): string {
+	const level = hskLevel ?? 3;
+	const charCount = hanzi.length;
+	const chars = [...hanzi].join(', ');
+
+	let focus: string;
+	let exampleStyle: string;
+
+	if (level <= 2) {
+		focus =
+			charCount === 1
+				? `Give a vivid visual or story mnemonic to make "${english}" stick. Mention the character's shape or radical if it helps.`
+				: `Break down what each character (${chars}) means and how they combine to form "${english}". Keep it simple.`;
+		exampleStyle = 'very short and beginner-friendly';
+	} else if (level <= 4) {
+		focus =
+			charCount === 1
+				? `Explain the meaning with useful associations, etymology, or how it's used in compounds.`
+				: `Break down each character (${chars}) and how they combine. Add one practical usage tip - collocations, common contexts, or what it contrasts with.`;
+		exampleStyle = 'natural, everyday';
+	} else {
+		focus =
+			charCount === 1
+				? `Explain the nuance, register, and usage context. When is this used vs similar words?`
+				: `Explain what each character (${chars}) contributes, the register (formal/written/spoken), and when to use this over similar expressions.`;
+		exampleStyle = 'natural, showing proper context and register';
+	}
+
+	return `Chinese HSK ${level} word: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
+
+${focus} No pinyin tips. Max 3 sentences.
+
+Then two ${exampleStyle} example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
+}
+
+function buildWrongPrompt(
+	hanzi: string,
+	pinyin: string,
+	pinyinPlain: string,
+	english: string,
+	hskLevel: number | null,
+	userAnswer: string
+): string {
+	const level = hskLevel ?? 3;
+	const errorType = classifyError(pinyinPlain, userAnswer);
+
+	const errorHint: Record<ErrorType, string> = {
+		close_typo: 'The student was very close - only a small spelling difference.',
+		transposition: 'The student had the right syllables but in the wrong order.',
+		wrong_syllable_count: `The student typed ${userAnswer.trim().split(/\s+/).length} syllable(s); the correct answer has ${pinyinPlain.trim().split(/\s+/).length}.`,
+		partial: 'The student partially remembered the pinyin.',
+		different: 'The student typed something quite different from the correct answer.'
+	};
+
+	return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}". ${errorHint[errorType]}
+
+In 2-3 sentences: explain the mistake and how to remember the correct answer. Focus on meaning and associations, not pinyin pronunciation. Be encouraging.
+
+Then two example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
+}
+
 export const POST: RequestHandler = async ({ request }) => {
 	const key = env.OPENAI_KEY;
 	if (!key) throw error(500, 'OPENAI_KEY is not configured');
 
-	const { wordId, hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer } = await request.json();
+	const { wordId, hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer } =
+		await request.json();
 
 	const openai = new OpenAI({ apiKey: key });
 
 	const prompt = userAnswer
-		? `A student is learning Chinese vocabulary using HSK flashcards. They were asked to type the pinyin (no tone marks) for the English prompt "${english}".
-
-Correct answer: "${pinyinPlain}" (tones: "${pinyin}", hanzi: "${hanzi}", HSK level: ${hskLevel ?? 'unknown'})
-Typed: "${userAnswer}"
-
-In 2-3 short sentences, help understand the mistake and remember the correct pinyin. Focus on what went wrong (common confusion, syllable split, similar-sounding word, etc.) and give a memorable tip. Be encouraging and concise. Then add two example sentences using this word, each on its own line, in the format: *pinyin with tones* - English translation.`
-		: `Explain this HSK ${hskLevel ?? ''} Chinese word to help remember it: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
-
-In 2-3 short sentences, give a memorable explanation - cover the meaning, any useful associations, and tips for remembering the pinyin. Be encouraging and concise. Then add two example sentences using this word, each on its own line, in the format: *pinyin with tones* - English translation.`;
+		? buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer)
+		: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel);
 
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
