@@ -310,9 +310,6 @@
 	</div>
 
 	<div class="flex flex-col items-end gap-1 self-start sm:self-center">
-		<div class="text-sm whitespace-nowrap text-base-content/50">
-			{remaining} remaining
-		</div>
 		<label
 			class="flex cursor-pointer items-center gap-1.5"
 			title="KI bewertet ob Fehler wirklich falsch sind"
