@@ -16,27 +16,11 @@
 		Wrench
 	} from '@lucide/svelte';
 	import { marked } from 'marked';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import { practiceSession, type WordResult, type PracticeWord } from '$lib/app.svelte';
 
 	let { data }: { data: PageData } = $props();
-
-	type WordResult = {
-		correct: boolean;
-		userAnswer: string;
-		word: {
-			id: number;
-			hanzi: string;
-			pinyin: string;
-			pinyinPlain: string;
-			english: string;
-			hskLevel: number;
-			exampleSentences: string | null;
-			starred: boolean;
-		};
-	};
-
-	type PracticeWord = WordResult['word'];
 
 	type PracticeNextResponse = {
 		word: PracticeWord | null;
@@ -46,73 +30,79 @@
 		needsReset: boolean;
 	};
 
-	let phase = $state<'input' | 'checking' | 'feedback'>('input');
-	let answer = $state('');
-	let result = $state<WordResult | null>(null);
-	let submitting = $state(false);
+	// Transient loading/UI state that doesn't need to survive navigation
 	let loading = $state(false);
-	let inputEl: HTMLInputElement | undefined = $state();
-	let showHint = $state(false);
+	let submitting = $state(false);
 	let explaining = $state(false);
-	let explanation = $state<string | null>(null);
-	let aiCheck = $state(true);
-	let aiCorrected = $state(false);
-	let aiReason = $state<string | null>(null);
-	let seenIds = $state<number[]>([]);
-	let sessionStartTotal = $state(0);
-	let starred = $state(false);
-	let repairing = $state(false);
-	let repaired = $state(false);
-	let repairError = $state<string | null>(null);
-	let showVocab = $state(false);
-	let shownEnglish = $state<string | null>(null);
-	let currentWord: PracticeWord | null = $derived(data.word);
-	let remaining = $derived(data.remaining);
-	let total = $derived(data.total);
-	let loadError = $state<string | null>(null);
+	let inputEl: HTMLInputElement | undefined = $state();
 
+	// Read-only derived aliases so the template doesn't need to change much
+	const currentWord = $derived(practiceSession.word);
+	const remaining = $derived(practiceSession.remaining);
+	const total = $derived(practiceSession.total);
+
+	// Initialise aiCheck from localStorage once on component mount
 	$effect(() => {
 		const stored = localStorage.getItem('aiCheck');
-		if (stored !== null) aiCheck = stored === 'true';
+		if (stored !== null) practiceSession.aiCheck = stored === 'true';
 	});
 
+	// Sync server data into session state.
+	// Uses untrack() for practiceSession fields so this effect only re-runs
+	// when server data changes - not when we write to practiceSession ourselves.
+	// That prevents a feedback loop where our writes trigger another init cycle.
 	$effect(() => {
-		if (seenIds.length === 0 && remaining > 0) {
-			sessionStartTotal = remaining;
+		const serverWord = data.word;
+		const serverRemaining = data.remaining;
+		const serverTotal = data.total;
+		const serverHsk = data.hsk ?? null;
+
+		practiceSession.remaining = serverRemaining;
+		practiceSession.total = serverTotal;
+
+		const needsInit =
+			untrack(() => practiceSession.wordId) === null ||
+			(serverHsk !== null && untrack(() => practiceSession.hsk) !== serverHsk);
+
+		if (needsInit) {
+			practiceSession.hsk = serverHsk;
+			practiceSession.word = serverWord;
+			practiceSession.wordId = serverWord?.id ?? null;
+			practiceSession.phase = 'input';
+			practiceSession.answer = '';
+			practiceSession.result = null;
+			practiceSession.showHint = false;
+			practiceSession.explanation = null;
+			practiceSession.aiCorrected = false;
+			practiceSession.aiReason = null;
+			practiceSession.loadError = null;
+			practiceSession.starred = serverWord?.starred ?? false;
+			practiceSession.repairing = false;
+			practiceSession.repaired = false;
+			practiceSession.repairError = null;
+			practiceSession.showVocab = false;
+			practiceSession.shownEnglish = null;
+			practiceSession.seenIds = [];
+			practiceSession.sessionStartTotal = serverRemaining > 0 ? serverRemaining : 0;
 		}
 	});
 
 	$effect(() => {
-		currentWord = data.word;
-		remaining = data.remaining;
-		total = data.total;
-		answer = '';
-		result = null;
-		showHint = false;
-		explanation = null;
-		aiCorrected = false;
-		aiReason = null;
-		loadError = null;
-		phase = 'input';
-		loading = false;
-		starred = data.word?.starred ?? false;
-		repairing = false;
-		repaired = false;
-		repairError = null;
-		showVocab = false;
-		shownEnglish = null;
+		if (practiceSession.phase === 'input' && inputEl) {
+			inputEl.focus();
+		}
 	});
 
 	function toggleAiCheck() {
-		aiCheck = !aiCheck;
-		localStorage.setItem('aiCheck', String(aiCheck));
+		practiceSession.aiCheck = !practiceSession.aiCheck;
+		localStorage.setItem('aiCheck', String(practiceSession.aiCheck));
 	}
 
 	async function explain() {
-		const word = result?.word ?? currentWord;
+		const word = practiceSession.result?.word ?? currentWord;
 		if (!word || explaining) return;
 		explaining = true;
-		explanation = null;
+		practiceSession.explanation = null;
 		try {
 			const res = await fetch('/api/explain', {
 				method: 'POST',
@@ -124,23 +114,23 @@
 					pinyinPlain: word.pinyinPlain,
 					english: word.english,
 					hskLevel: word.hskLevel,
-					userAnswer: result?.userAnswer ?? ''
+					userAnswer: practiceSession.result?.userAnswer ?? ''
 				})
 			});
-			const data = await res.json();
-			explanation = data.explanation ?? null;
+			const json = await res.json();
+			practiceSession.explanation = json.explanation ?? null;
 		} catch {
-			explanation = 'Could not load explanation. Please try again.';
+			practiceSession.explanation = 'Could not load explanation. Please try again.';
 		} finally {
 			explaining = false;
 		}
 	}
 
 	async function repair() {
-		const word = result?.word ?? currentWord;
-		if (!word || repairing) return;
-		repairing = true;
-		repairError = null;
+		const word = practiceSession.result?.word ?? currentWord;
+		if (!word || practiceSession.repairing) return;
+		practiceSession.repairing = true;
+		practiceSession.repairError = null;
 		try {
 			const res = await fetch('/api/repair', {
 				method: 'POST',
@@ -151,49 +141,47 @@
 					pinyin: word.pinyin,
 					pinyinPlain: word.pinyinPlain,
 					english: word.english,
-					explanation
+					explanation: practiceSession.explanation
 				})
 			});
 			if (!res.ok) throw new Error('Repair failed');
 			const corrected = await res.json();
-			if (result) {
-				result = { ...result, word: { ...result.word, english: corrected.english } };
+			if (practiceSession.result) {
+				practiceSession.result = {
+					...practiceSession.result,
+					word: { ...practiceSession.result.word, english: corrected.english }
+				};
 			} else {
-				shownEnglish = corrected.english;
+				practiceSession.shownEnglish = corrected.english;
 			}
-			repaired = true;
+			practiceSession.repaired = true;
 		} catch {
-			repairError = 'Could not repair the flashcard. Please try again.';
+			practiceSession.repairError = 'Could not repair the flashcard. Please try again.';
 		} finally {
-			repairing = false;
+			practiceSession.repairing = false;
 		}
 	}
 
-	$effect(() => {
-		if (phase === 'input' && inputEl) {
-			inputEl.focus();
-		}
-	});
-
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && phase === 'feedback' && !loading) {
+		if (e.key === 'Enter' && practiceSession.phase === 'feedback' && !loading) {
 			e.preventDefault();
 			next();
 		}
 	}
 
 	async function toggleStar(wordId: number) {
-		starred = !starred;
+		practiceSession.starred = !practiceSession.starred;
 		await fetch('/api/star', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ wordId, starred })
+			body: JSON.stringify({ wordId, starred: practiceSession.starred })
 		});
 	}
 
 	function setFilter(hsk: number | null) {
-		seenIds = [];
-		sessionStartTotal = 0;
+		// Setting wordId = null forces the sync $effect to re-init when new data
+		// arrives, even if the HSK level comparison hasn't changed yet.
+		practiceSession.wordId = null;
 		const params = new SvelteURLSearchParams();
 		if (hsk) params.set('hsk', String(hsk));
 		goto(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), {
@@ -217,7 +205,7 @@
 
 	async function loadSessionWord(lastId: number | null, newSeenIds: number[]) {
 		loading = true;
-		loadError = null;
+		practiceSession.loadError = null;
 		const params = buildNextParams(lastId, newSeenIds);
 
 		try {
@@ -225,43 +213,45 @@
 			if (!res.ok) throw new Error('Could not load next word');
 			const nextData = (await res.json()) as PracticeNextResponse;
 
-			seenIds = newSeenIds;
-			currentWord = nextData.word;
-			remaining = nextData.remaining;
-			total = nextData.total;
+			practiceSession.seenIds = newSeenIds;
+			practiceSession.word = nextData.word;
+			practiceSession.wordId = nextData.word?.id ?? null;
+			practiceSession.remaining = nextData.remaining;
+			practiceSession.total = nextData.total;
 			replaceState(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), page.state);
 
-			answer = '';
-			result = null;
-			explanation = null;
-			showHint = false;
-			aiCorrected = false;
-			aiReason = null;
-			starred = nextData.word?.starred ?? false;
-			repairing = false;
-			repaired = false;
-			repairError = null;
-			showVocab = false;
-			shownEnglish = null;
-			phase = 'input';
+			practiceSession.answer = '';
+			practiceSession.result = null;
+			practiceSession.explanation = null;
+			practiceSession.showHint = false;
+			practiceSession.aiCorrected = false;
+			practiceSession.aiReason = null;
+			practiceSession.starred = nextData.word?.starred ?? false;
+			practiceSession.repairing = false;
+			practiceSession.repaired = false;
+			practiceSession.repairError = null;
+			practiceSession.showVocab = false;
+			practiceSession.shownEnglish = null;
+			practiceSession.phase = 'input';
 			loading = false;
 
 			await tick();
 			inputEl?.focus();
 		} catch {
-			loadError = 'Could not load the next word. Please try again.';
+			practiceSession.loadError = 'Could not load the next word. Please try again.';
 			loading = false;
 		}
 	}
 
 	async function next() {
-		const currentId = result?.word.id ?? currentWord?.id ?? null;
-		const newSeenIds = currentId !== null ? [...seenIds, currentId] : seenIds;
+		const currentId = practiceSession.result?.word.id ?? currentWord?.id ?? null;
+		const newSeenIds =
+			currentId !== null ? [...practiceSession.seenIds, currentId] : practiceSession.seenIds;
 		await loadSessionWord(currentId, newSeenIds);
 	}
 
 	async function skip() {
-		await loadSessionWord(currentWord?.id ?? null, seenIds);
+		await loadSessionWord(currentWord?.id ?? null, practiceSession.seenIds);
 	}
 
 	const LEVEL_COLORS = [
@@ -277,7 +267,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
-	<title>Practice{data.hsk ? ` - HSK ${data.hsk}` : ''} - HSK Trainer</title>
+	<title>Practice{practiceSession.hsk ? ` - HSK ${practiceSession.hsk}` : ''} - HSK Trainer</title>
 </svelte:head>
 
 <!-- Top bar -->
@@ -289,7 +279,7 @@
 
 	<div class="flex flex-1 justify-start sm:justify-center">
 		<span class="text-sm font-semibold text-base-content/70">
-			{data.hsk ? `HSK ${data.hsk}` : 'All levels'}
+			{practiceSession.hsk ? `HSK ${practiceSession.hsk}` : 'All levels'}
 		</span>
 	</div>
 
@@ -302,7 +292,7 @@
 			<input
 				type="checkbox"
 				class="toggle toggle-primary toggle-xs"
-				checked={aiCheck}
+				checked={practiceSession.aiCheck}
 				onchange={toggleAiCheck}
 			/>
 		</label>
@@ -310,16 +300,16 @@
 </div>
 
 <!-- Progress bar -->
-{#if sessionStartTotal > 0}
+{#if practiceSession.sessionStartTotal > 0}
 	<div class="mb-6">
 		<div class="mb-1 flex justify-between text-xs text-base-content/50">
-			<span>{seenIds.length} done this session</span>
-			<span>{sessionStartTotal - seenIds.length} remaining</span>
+			<span>{practiceSession.seenIds.length} done this session</span>
+			<span>{practiceSession.sessionStartTotal - practiceSession.seenIds.length} remaining</span>
 		</div>
 		<progress
 			class="progress h-2 w-full progress-primary"
-			value={seenIds.length}
-			max={sessionStartTotal}
+			value={practiceSession.seenIds.length}
+			max={practiceSession.sessionStartTotal}
 		></progress>
 	</div>
 {/if}
@@ -332,16 +322,16 @@
 			<div class="max-w-sm">
 				<div class="mb-4 text-6xl">🎉</div>
 				<h2 class="mb-2 text-2xl font-bold">
-					{data.hsk ? `HSK ${data.hsk} complete!` : 'All words learned!'}
+					{practiceSession.hsk ? `HSK ${practiceSession.hsk} complete!` : 'All words learned!'}
 				</h2>
 				<p class="mb-6 text-base-content/60">
 					You've learned all {total} words in this set.
 				</p>
 				<div class="flex flex-wrap justify-center gap-2">
 					<a href={resolve('/')} class="btn btn-primary">Back to Dashboard</a>
-					{#if data.hsk && data.hsk < 6}
-						<button class="btn btn-outline" onclick={() => setFilter(data.hsk! + 1)}>
-							Try HSK {data.hsk + 1}
+					{#if practiceSession.hsk && practiceSession.hsk < 6}
+						<button class="btn btn-outline" onclick={() => setFilter(practiceSession.hsk! + 1)}>
+							Try HSK {practiceSession.hsk + 1}
 						</button>
 					{/if}
 				</div>
@@ -356,15 +346,14 @@
 				<div class="mb-4 text-5xl">✓</div>
 				<h2 class="mb-2 text-2xl font-bold">Session complete!</h2>
 				<p class="mb-6 text-base-content/60">
-					You went through all {seenIds.length} words. {remaining} still to learn - restart to practice
-					them again.
+					You went through all {practiceSession.seenIds.length} words. {remaining} still to learn -
+					restart to practice them again.
 				</p>
 				<div class="flex flex-wrap justify-center gap-2">
 					<button
 						class="btn btn-primary"
 						onclick={() => {
-							seenIds = [];
-							sessionStartTotal = 0;
+							practiceSession.wordId = null;
 							const params = new SvelteURLSearchParams(page.url.searchParams);
 							params.delete('exclude');
 							params.delete('last');
@@ -381,15 +370,18 @@
 			</div>
 		</div>
 	</div>
-{:else if phase === 'input'}
+{:else if practiceSession.phase === 'input'}
 	<!-- Practice card -->
 	<div class="card relative mx-auto max-w-xl bg-base-100 shadow-lg">
 		<button
 			class="btn absolute top-3 right-3 btn-circle btn-ghost btn-sm"
-			title={starred ? 'Unstar' : 'Star this word'}
+			title={practiceSession.starred ? 'Unstar' : 'Star this word'}
 			onclick={() => toggleStar(currentWord!.id)}
 		>
-			<Star size={18} class={starred ? 'fill-warning text-warning' : 'text-base-content/30'} />
+			<Star
+				size={18}
+				class={practiceSession.starred ? 'fill-warning text-warning' : 'text-base-content/30'}
+			/>
 		</button>
 		<div class="card-body gap-6 px-8 py-10">
 			<!-- Word info badges -->
@@ -404,7 +396,9 @@
 				<p class="mb-2 text-xs tracking-widest text-base-content/40 uppercase">
 					Translate to pinyin
 				</p>
-				<p class="text-3xl leading-snug font-semibold">{shownEnglish ?? currentWord.english}</p>
+				<p class="text-3xl leading-snug font-semibold">
+					{practiceSession.shownEnglish ?? currentWord.english}
+				</p>
 			</div>
 
 			<!-- Input form -->
@@ -418,8 +412,12 @@
 						if (actionResult.type === 'success' && actionResult.data) {
 							const wordResult = actionResult.data as WordResult;
 
-							if (!wordResult.correct && aiCheck && wordResult.userAnswer.trim()) {
-								phase = 'checking';
+							if (
+								!wordResult.correct &&
+								practiceSession.aiCheck &&
+								wordResult.userAnswer.trim()
+							) {
+								practiceSession.phase = 'checking';
 								try {
 									const res = await fetch('/api/check-answer', {
 										method: 'POST',
@@ -434,24 +432,25 @@
 									});
 									const { valid, reason } = await res.json();
 									if (valid === 0) {
-										result = { ...wordResult, correct: true };
-										aiCorrected = true;
-										aiReason = null;
+										practiceSession.result = { ...wordResult, correct: true };
+										practiceSession.aiCorrected = true;
+										practiceSession.aiReason = null;
 									} else {
-										result = wordResult;
-										aiCorrected = false;
-										aiReason = reason ?? null;
+										practiceSession.result = wordResult;
+										practiceSession.aiCorrected = false;
+										practiceSession.aiReason = reason ?? null;
 									}
 								} catch {
-									result = wordResult;
-									aiCorrected = false;
+									practiceSession.result = wordResult;
+									practiceSession.aiCorrected = false;
 								}
 							} else {
-								result = wordResult;
+								practiceSession.result = wordResult;
 							}
 
-							starred = result?.word.starred ?? starred;
-							phase = 'feedback';
+							practiceSession.starred =
+								practiceSession.result?.word.starred ?? practiceSession.starred;
+							practiceSession.phase = 'feedback';
 						}
 					};
 				}}
@@ -459,66 +458,68 @@
 				<input type="hidden" name="wordId" value={currentWord.id} />
 
 				<div class="flex flex-col gap-3">
-					{#if !showVocab}
-					<input
-						bind:this={inputEl}
-						bind:value={answer}
-						name="answer"
-						type="text"
-						placeholder="Type pinyin without tones..."
-						class="input-bordered input input-lg w-full text-center text-xl tracking-wide"
-						autocomplete="off"
-						autocorrect="off"
-						autocapitalize="off"
-						spellcheck="false"
-						disabled={submitting}
-					/>
+					{#if !practiceSession.showVocab}
+						<input
+							bind:this={inputEl}
+							bind:value={practiceSession.answer}
+							name="answer"
+							type="text"
+							placeholder="Type pinyin without tones..."
+							class="input-bordered input input-lg w-full text-center text-xl tracking-wide"
+							autocomplete="off"
+							autocorrect="off"
+							autocapitalize="off"
+							spellcheck="false"
+							disabled={submitting}
+						/>
 					{/if}
 
-					{#if !showVocab}
-					<div class="flex gap-2">
-						<button
-							type="button"
-							class="btn flex-1 gap-1 btn-ghost bg-base-200"
-							onclick={() => (showVocab = true)}
-						>
-							<Eye size={16} />
-							Show
-						</button>
-						<button
-							type="submit"
-							class="btn flex-1 gap-1 btn-primary"
-							disabled={!answer.trim() || submitting}
-						>
-							{#if submitting}
-								<Loader size={16} class="animate-spin" />
-							{:else}
-								Check
-								<ChevronRight size={16} />
-							{/if}
-						</button>
-					</div>
+					{#if !practiceSession.showVocab}
+						<div class="flex gap-2">
+							<button
+								type="button"
+								class="btn flex-1 gap-1 btn-ghost bg-base-200"
+								onclick={() => (practiceSession.showVocab = true)}
+							>
+								<Eye size={16} />
+								Show
+							</button>
+							<button
+								type="submit"
+								class="btn flex-1 gap-1 btn-primary"
+								disabled={!practiceSession.answer.trim() || submitting}
+							>
+								{#if submitting}
+									<Loader size={16} class="animate-spin" />
+								{:else}
+									Check
+									<ChevronRight size={16} />
+								{/if}
+							</button>
+						</div>
 					{/if}
-					{#if loadError}
-						<p class="text-center text-sm text-error">{loadError}</p>
+					{#if practiceSession.loadError}
+						<p class="text-center text-sm text-error">{practiceSession.loadError}</p>
 					{/if}
 				</div>
 			</form>
 
-			{#if showVocab}
+			{#if practiceSession.showVocab}
 				<div class="border-t border-base-200 pt-4">
 					<div class="py-2 text-center">
 						<div class="hanzi mb-3 text-6xl leading-none font-bold">{currentWord.hanzi}</div>
 						<div class="text-lg font-medium tracking-widest text-primary">{currentWord.pinyin}</div>
-						<div class="mt-1 text-sm text-base-content/60">{shownEnglish ?? currentWord.english}</div>
+						<div class="mt-1 text-sm text-base-content/60">
+							{practiceSession.shownEnglish ?? currentWord.english}
+						</div>
 					</div>
 
-					{#if explanation}
+					{#if practiceSession.explanation}
 						<div
 							class="explanation-md mt-3 rounded-xl bg-base-200 px-4 py-3 text-sm leading-relaxed text-base-content/80"
 						>
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-							{@html marked.parse(explanation)}
+							{@html marked.parse(practiceSession.explanation)}
 						</div>
 					{/if}
 
@@ -537,14 +538,14 @@
 							{/if}
 						</button>
 						<button
-							class="btn gap-2 btn-outline btn-sm {repaired ? 'btn-success' : ''}"
+							class="btn gap-2 btn-outline btn-sm {practiceSession.repaired ? 'btn-success' : ''}"
 							onclick={repair}
-							disabled={repairing}
+							disabled={practiceSession.repairing}
 						>
-							{#if repairing}
+							{#if practiceSession.repairing}
 								<Loader size={14} class="animate-spin" />
 								Repairing...
-							{:else if repaired}
+							{:else if practiceSession.repaired}
 								<Wrench size={14} />
 								Repaired!
 							{:else}
@@ -553,8 +554,8 @@
 							{/if}
 						</button>
 					</div>
-					{#if repairError}
-						<p class="mt-2 text-center text-sm text-error">{repairError}</p>
+					{#if practiceSession.repairError}
+						<p class="mt-2 text-center text-sm text-error">{practiceSession.repairError}</p>
 					{/if}
 
 					<button class="btn mt-3 w-full gap-2 btn-primary" onclick={next} disabled={loading}>
@@ -566,28 +567,28 @@
 							<ChevronRight size={16} />
 						{/if}
 					</button>
-					{#if loadError}
-						<p class="mt-2 text-center text-sm text-error">{loadError}</p>
+					{#if practiceSession.loadError}
+						<p class="mt-2 text-center text-sm text-error">{practiceSession.loadError}</p>
 					{/if}
 				</div>
 			{/if}
 
 			{#if currentWord.exampleSentences}
 				<div class="border-t border-base-200 pt-4">
-					{#if showHint}
+					{#if practiceSession.showHint}
 						<div class="text-sm leading-relaxed whitespace-pre-line text-base-content/70">
 							{currentWord.exampleSentences}
 						</div>
 						<button
 							class="btn mt-2 text-base-content/40 btn-ghost btn-xs"
-							onclick={() => (showHint = false)}
+							onclick={() => (practiceSession.showHint = false)}
 						>
 							Tipp verstecken
 						</button>
 					{:else}
 						<button
 							class="btn gap-1 text-base-content/50 btn-ghost btn-sm"
-							onclick={() => (showHint = true)}
+							onclick={() => (practiceSession.showHint = true)}
 						>
 							Tipp anzeigen
 						</button>
@@ -596,7 +597,7 @@
 			{/if}
 		</div>
 	</div>
-{:else if phase === 'checking'}
+{:else if practiceSession.phase === 'checking'}
 	<!-- AI checking phase -->
 	<div class="card mx-auto max-w-xl bg-base-100 shadow-lg">
 		<div class="card-body items-center gap-3 py-16">
@@ -604,28 +605,31 @@
 			<p class="text-sm text-base-content/50">KI bewertet die Antwort...</p>
 		</div>
 	</div>
-{:else if phase === 'feedback' && result}
+{:else if practiceSession.phase === 'feedback' && practiceSession.result}
 	<!-- Feedback card -->
 	<div
-		class="card relative mx-auto max-w-xl border-2 shadow-lg {result.correct
+		class="card relative mx-auto max-w-xl border-2 shadow-lg {practiceSession.result.correct
 			? 'border-success/30 bg-success/10'
 			: 'border-error/30 bg-error/10'}"
 	>
 		<button
 			class="btn absolute top-3 right-3 btn-circle btn-ghost btn-sm"
-			title={starred ? 'Unstar' : 'Star this word'}
-			onclick={() => toggleStar(result!.word.id)}
+			title={practiceSession.starred ? 'Unstar' : 'Star this word'}
+			onclick={() => toggleStar(practiceSession.result!.word.id)}
 		>
-			<Star size={18} class={starred ? 'fill-warning text-warning' : 'text-base-content/30'} />
+			<Star
+				size={18}
+				class={practiceSession.starred ? 'fill-warning text-warning' : 'text-base-content/30'}
+			/>
 		</button>
 		<div class="card-body gap-5 px-8 py-10">
 			<!-- Result banner -->
 			<div
-				class="flex items-center gap-2 text-lg font-bold {result.correct
+				class="flex items-center gap-2 text-lg font-bold {practiceSession.result.correct
 					? 'text-success'
 					: 'text-error'}"
 			>
-				{#if result.correct}
+				{#if practiceSession.result.correct}
 					<CheckCircle size={24} />
 					Correct!
 				{:else}
@@ -634,39 +638,47 @@
 				{/if}
 			</div>
 
-			{#if result.correct && aiCorrected}
+			{#if practiceSession.result.correct && practiceSession.aiCorrected}
 				<div class="rounded-xl bg-base-100 px-4 py-3 text-center text-sm text-base-content/60">
 					You typed:
-					<span class="ml-1 font-mono text-base-content/80">{result.userAnswer}</span>
+					<span class="ml-1 font-mono text-base-content/80"
+						>{practiceSession.result.userAnswer}</span
+					>
 				</div>
 			{/if}
 
 			<!-- Hanzi (big reveal) -->
 			<div class="py-2 text-center">
-				<div class="hanzi mb-3 text-7xl leading-none font-bold">{result.word.hanzi}</div>
-				<div class="text-xl font-medium tracking-widest text-primary">{result.word.pinyin}</div>
-				<div class="mt-1 text-base-content/60">{result.word.english}</div>
+				<div class="hanzi mb-3 text-7xl leading-none font-bold">
+					{practiceSession.result.word.hanzi}
+				</div>
+				<div class="text-xl font-medium tracking-widest text-primary">
+					{practiceSession.result.word.pinyin}
+				</div>
+				<div class="mt-1 text-base-content/60">{practiceSession.result.word.english}</div>
 			</div>
 
 			<!-- If wrong: show what they typed + Explain button -->
-			{#if !result.correct}
+			{#if !practiceSession.result.correct}
 				<div class="rounded-xl bg-base-100 px-4 py-3 text-center text-sm">
 					<span class="text-base-content/50">You typed:</span>
-					<span class="ml-2 font-mono text-error">{result.userAnswer || '(empty)'}</span>
+					<span class="ml-2 font-mono text-error"
+						>{practiceSession.result.userAnswer || '(empty)'}</span
+					>
 					<span class="mx-2 text-base-content/50">·</span>
 					<span class="text-base-content/50">Correct:</span>
-					<span class="ml-2 font-mono text-success">{result.word.pinyinPlain}</span>
-					{#if aiReason}
-						<div class="mt-2 text-base-content/50 italic">{aiReason}</div>
+					<span class="ml-2 font-mono text-success">{practiceSession.result.word.pinyinPlain}</span>
+					{#if practiceSession.aiReason}
+						<div class="mt-2 text-base-content/50 italic">{practiceSession.aiReason}</div>
 					{/if}
 				</div>
 
-				{#if explanation}
+				{#if practiceSession.explanation}
 					<div
 						class="explanation-md rounded-xl bg-base-100 px-4 py-3 text-sm leading-relaxed text-base-content/80"
 					>
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(explanation)}
+						{@html marked.parse(practiceSession.explanation)}
 					</div>
 				{/if}
 
@@ -685,14 +697,14 @@
 						{/if}
 					</button>
 					<button
-						class="btn gap-2 btn-outline btn-sm {repaired ? 'btn-success' : ''}"
+						class="btn gap-2 btn-outline btn-sm {practiceSession.repaired ? 'btn-success' : ''}"
 						onclick={repair}
-						disabled={repairing}
+						disabled={practiceSession.repairing}
 					>
-						{#if repairing}
+						{#if practiceSession.repairing}
 							<Loader size={14} class="animate-spin" />
 							Repairing...
-						{:else if repaired}
+						{:else if practiceSession.repaired}
 							<Wrench size={14} />
 							Repaired!
 						{:else}
@@ -701,15 +713,15 @@
 						{/if}
 					</button>
 				</div>
-				{#if repairError}
-					<p class="text-center text-sm text-error">{repairError}</p>
+				{#if practiceSession.repairError}
+					<p class="text-center text-sm text-error">{practiceSession.repairError}</p>
 				{/if}
 			{/if}
 
 			<!-- Badges -->
 			<div class="flex justify-center gap-2">
-				<span class="badge {LEVEL_COLORS[result.word.hskLevel - 1]} badge-sm">
-					HSK {result.word.hskLevel}
+				<span class="badge {LEVEL_COLORS[practiceSession.result.word.hskLevel - 1]} badge-sm">
+					HSK {practiceSession.result.word.hskLevel}
 				</span>
 			</div>
 
@@ -722,8 +734,8 @@
 					<ChevronRight size={16} />
 				{/if}
 			</button>
-			{#if loadError}
-				<p class="text-center text-sm text-error">{loadError}</p>
+			{#if practiceSession.loadError}
+				<p class="text-center text-sm text-error">{practiceSession.loadError}</p>
 			{/if}
 		</div>
 	</div>
