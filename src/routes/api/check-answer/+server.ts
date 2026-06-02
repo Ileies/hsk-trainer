@@ -12,6 +12,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const { wordId, hanzi, pinyinPlain, english, userAnswer } = await request.json();
 
+	const correct = (pinyinPlain as string).replace(/\s+/g, '');
+	const typed = (userAnswer as string ?? '').replace(/\s+/g, '');
+
 	const openai = new OpenAI({ apiKey: key });
 
 	const response = await openai.responses.create({
@@ -22,12 +25,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		input: `HSK pinyin typo check.
 
 Word: ${hanzi} (${english})
-Correct: ${pinyinPlain}
-Typed: ${userAnswer || '(empty)'}
+Correct: ${correct}
+Typed: ${typed || '(empty)'}
 
-Step 1: Normalize both inputs by removing all spaces and tone numbers/marks.
-Step 2: Compare syllable by syllable. If a syllable has at most one character error (extra, missing, or wrong key adjacent on keyboard), it is a typo for that syllable.
-Step 3: Spaces and tone numbers are never counted as errors.
+Compare syllable by syllable. A syllable is a typo only if it differs by a single wrong-key substitution or transposition. Missing or added final consonants (n, ng, r) are always genuine mistakes, not typos.
 
 Reply "0" if ALL syllables match or are typos by the above definition. The overall shape of the word must still be recognizable.
 
