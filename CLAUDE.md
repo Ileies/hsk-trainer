@@ -114,7 +114,9 @@ All three return 500 if `OPENAI_KEY` is unset. The UI handles this gracefully (b
 
 ## Seed script
 
-`scripts/seed.ts` reads `static/hsk{1-6}.csv` (format: `hanzi,pinyin,english`), strips tones to produce `pinyinPlain`, auto-detects a topic via regex rules, and upserts into the database (skips existing `hanzi:hskLevel` pairs). Run with `bun run db:seed`.
+`scripts/seed.ts` reads `scripts/vocabulary-data.json` (5,000 entries exported from the canonical database) and upserts into the database - skips existing `hanzi:hskLevel` pairs, so it is safe to run on an already-populated DB. Run with `bun run db:seed`.
+
+`vocabulary-data.json` is the source of truth for the vocabulary. It contains `hanzi`, `pinyin`, `pinyin_plain`, `english`, `hsk_level`, `topic`, and `example_sentences` for all 5,000 words. There are no CSV source files.
 
 ## Common tasks
 
