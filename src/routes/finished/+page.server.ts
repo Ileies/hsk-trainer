@@ -6,8 +6,10 @@ import { eq, and } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ url }) => {
 	const hskParam = url.searchParams.get('hsk');
 	const hskLevel = hskParam ? parseInt(hskParam) : null;
+	const showAll = url.searchParams.get('all') === '1';
 
-	const conditions = [eq(vocabulary.learned, true)];
+	const conditions = [];
+	if (!showAll) conditions.push(eq(vocabulary.learned, true));
 	if (hskLevel !== null && !isNaN(hskLevel)) {
 		conditions.push(eq(vocabulary.hskLevel, hskLevel));
 	}
@@ -15,10 +17,10 @@ export const load: PageServerLoad = async ({ url }) => {
 	const words = await db
 		.select()
 		.from(vocabulary)
-		.where(and(...conditions))
+		.where(conditions.length > 0 ? and(...conditions) : undefined)
 		.orderBy(vocabulary.hskLevel);
 
-	return { words, hskLevel };
+	return { words, hskLevel, showAll };
 };
 
 export const actions: Actions = {

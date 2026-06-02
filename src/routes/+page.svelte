@@ -107,12 +107,10 @@
 					</div>
 
 					<div class="card-actions justify-end items-center mt-1 gap-2">
-						{#if learned > 0}
-							<a href="/finished?hsk={stat.hskLevel}" class="btn btn-sm gap-1">
-								<BookOpen size={14} />
-								Review
-							</a>
-						{/if}
+						<a href="/finished?hsk={stat.hskLevel}" class="btn btn-sm gap-1">
+							<BookOpen size={14} />
+							Review
+						</a>
 						<a
 							href="/practice?hsk={stat.hskLevel}"
 							class="btn btn-sm gap-1"
