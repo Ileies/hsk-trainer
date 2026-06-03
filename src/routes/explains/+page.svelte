@@ -38,13 +38,16 @@
 			<div class="card bg-base-100 shadow-sm">
 				<div class="card-body gap-3 py-5 px-6">
 					<div class="flex items-start justify-between gap-4">
-						<div class="flex items-center gap-3">
+						<a
+							href="/search?id={item.vocabularyId}"
+							class="flex items-center gap-3 hover:opacity-70 transition-opacity"
+						>
 							<span class="hanzi text-3xl font-bold">{item.hanzi}</span>
 							<div>
 								<div class="text-primary font-medium tracking-widest">{item.pinyin}</div>
 								<div class="text-base-content/60 text-sm">{item.english}</div>
 							</div>
-						</div>
+						</a>
 						<form method="POST" action="?/delete" use:enhance>
 							<input type="hidden" name="id" value={item.id} />
 							<button
