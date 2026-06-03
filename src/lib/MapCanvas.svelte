@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { forceSimulation, forceManyBody, forceLink } from 'd3-force';
+	import { forceSimulation, forceManyBody, forceLink, forceCenter } from 'd3-force';
 	import type { SimulationNodeDatum } from 'd3-force';
 	import { quadtree as d3quadtree } from 'd3-quadtree';
 	import { buildGraph, bfsDistances } from '$lib/mapGraph';
@@ -9,7 +9,7 @@
 
 	let { words }: { words: Word[] } = $props();
 
-	type SimNode = Word & SimulationNodeDatum;
+	type SimNode = Word & SimulationNodeDatum & { degree: number };
 
 	// HSK filter - all on by default (only controls visibility, not simulation)
 	let activeHsk = $state(new Set([1, 2, 3, 4, 5, 6]));
@@ -131,29 +131,55 @@
 		adjacency = adj;
 		keptEdges = edges;
 
-		const spread = Math.sqrt(simWords.length) * 60;
-		const simNodes: SimNode[] = simWords.map((w) => ({
+		// Compute degree from the pruned edge set
+		const degree = new Map<number, number>(simWords.map((w) => [w.id, 0]));
+		for (const edge of edges) {
+			degree.set(edge.sourceId, (degree.get(edge.sourceId) ?? 0) + 1);
+			degree.set(edge.targetId, (degree.get(edge.targetId) ?? 0) + 1);
+		}
+
+		// Sort highest-degree first so they land at the center of the spiral
+		const byDegree = [...simWords].sort(
+			(a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0)
+		);
+
+		const connectedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) > 0);
+		const isolatedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) === 0);
+
+		// Simulation runs on connected nodes only. Isolated nodes never enter the simulation -
+		// their positions are placed deterministically after we know where the cluster settled,
+		// so they can never form force-equilibrium rings.
+		const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ≈ 2.399963 rad
+		const spiralScale = 20;
+		const connSimNodes: SimNode[] = connectedWords.map((w, i) => ({
 			...w,
-			x: (Math.random() - 0.5) * spread * 2,
-			y: (Math.random() - 0.5) * spread * 2
+			x: spiralScale * Math.sqrt(i + 1) * Math.cos(i * goldenAngle),
+			y: spiralScale * Math.sqrt(i + 1) * Math.sin(i * goldenAngle),
+			degree: degree.get(w.id) ?? 0
 		}));
 
-		const idToSim = new Map(simNodes.map((n) => [n.id, n]));
+		const idToConn = new Map(connSimNodes.map((n) => [n.id, n]));
 
 		const simLinks = edges
 			.map((e) => {
-				const s = idToSim.get(e.sourceId);
-				const t = idToSim.get(e.targetId);
-				return s && t ? { source: s, target: t } : null;
+				const s = idToConn.get(e.sourceId);
+				const t = idToConn.get(e.targetId);
+				return s && t ? { source: s, target: t, score: e.score } : null;
 			})
 			.filter((l): l is NonNullable<typeof l> => l !== null);
 
-		const sim = forceSimulation(simNodes)
-			.force('charge', forceManyBody().strength(-30))
-			.force('link', forceLink(simLinks).distance(60).strength(0.5))
+		const sim = forceSimulation(connSimNodes)
+			.force('charge', forceManyBody().strength(-80))
+			.force(
+				'link',
+				forceLink(simLinks)
+					.distance((l: any) => 20 + 60 / (1 + l.score * 10))
+					.strength(0.6)
+			)
+			.force('center', forceCenter(0, 0))
 			.stop();
 
-		const TOTAL = 300;
+		const TOTAL = 400;
 		const CHUNK = 15;
 		let done = 0;
 
@@ -166,16 +192,36 @@
 				return;
 			}
 
-			const cx = simNodes.reduce((s, n) => s + (n.x ?? 0), 0) / simNodes.length;
-			const cy = simNodes.reduce((s, n) => s + (n.y ?? 0), 0) / simNodes.length;
-			for (const n of simNodes) {
+			// Center the connected cluster
+			const cx = connSimNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connSimNodes.length;
+			const cy = connSimNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connSimNodes.length;
+			for (const n of connSimNodes) {
 				n.x = (n.x ?? 0) - cx;
 				n.y = (n.y ?? 0) - cy;
 			}
 
-			nodes = simNodes;
-			nodeById = idToSim;
-			basePositions = simNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
+			// Measure actual cluster boundary after simulation has settled
+			const clusterR = connSimNodes.reduce(
+				(r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)),
+				0
+			);
+
+			// Place isolated nodes in a Fermat spiral starting just outside the cluster.
+			// sqrt(i+1) expansion gives naturally decreasing density outward - no ring possible.
+			const innerR = clusterR + 30;
+			const isoSimNodes: SimNode[] = isolatedWords.map((w, i) => ({
+				...w,
+				x: (innerR + 12 * Math.sqrt(i + 1)) * Math.cos(i * goldenAngle),
+				y: (innerR + 12 * Math.sqrt(i + 1)) * Math.sin(i * goldenAngle),
+				degree: 0
+			}));
+
+			const allNodes = [...connSimNodes, ...isoSimNodes];
+			const allById = new Map(allNodes.map((n) => [n.id, n]));
+
+			nodes = allNodes;
+			nodeById = allById;
+			basePositions = allNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
 
 			applyLayout();
 
@@ -190,9 +236,7 @@
 
 			loading = false;
 
-			const hsk1 = simNodes.filter((n) => n.hskLevel === 1);
-			const autoFocus =
-				hsk1.length > 0 ? hsk1[Math.floor(Math.random() * hsk1.length)] : simNodes[0];
+			const autoFocus = byDegree[0] ?? connSimNodes[0];
 			if (autoFocus) focusNode(autoFocus.id);
 		}
 
@@ -441,7 +485,9 @@
 			const ny = node.y ?? 0;
 			const alpha = nodeAlpha(d);
 			if (alpha < 0.01) return;
-			const r = focused ? nodeRadius(d) / cam.scale : 5 / cam.scale;
+			const r = focused
+				? nodeRadius(d) / cam.scale
+				: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
 			const color = hskColor(node.hskLevel);
 			const isFocused = node.id === focusedId;
 
@@ -473,7 +519,9 @@
 					: cam.scale > 1.2
 				: cam.scale > 1.3;
 			if (!showLabel) return;
-			const r = focused ? nodeRadius(d) / cam.scale : 5 / cam.scale;
+			const r = focused
+				? nodeRadius(d) / cam.scale
+				: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
 			const isFocused = node.id === focusedId;
 			const fs = Math.max(7, Math.round(12 / cam.scale));
 			ctx.save();
@@ -483,6 +531,25 @@
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'top';
 			ctx.fillText(node.hanzi, node.x ?? 0, (node.y ?? 0) + r + 2 / cam.scale);
+			ctx.restore();
+		}
+
+		// Pass 0: edge skeleton - always visible so graph structure is legible at any zoom
+		{
+			ctx.save();
+			ctx.strokeStyle = '#aaaaaa';
+			ctx.lineWidth = 1 / cam.scale;
+			ctx.globalAlpha = focused ? 0.04 : 0.08;
+			ctx.beginPath();
+			for (const edge of keptEdges) {
+				const sNode = nodeById.get(edge.sourceId);
+				const tNode = nodeById.get(edge.targetId);
+				if (!sNode || !tNode) continue;
+				if (!activeHsk.has(sNode.hskLevel) || !activeHsk.has(tNode.hskLevel)) continue;
+				ctx.moveTo(sNode.x ?? 0, sNode.y ?? 0);
+				ctx.lineTo(tNode.x ?? 0, tNode.y ?? 0);
+			}
+			ctx.stroke();
 			ctx.restore();
 		}
 
@@ -731,11 +798,6 @@
 			{/if}
 			<span class="text-xs text-base-content/40">
 				{visibleCount.toLocaleString()} words
-				{#if focusedId !== null}
-					<span class="text-primary ml-2">
-						- {nodeById.get(focusedId)?.hanzi} ({nodeById.get(focusedId)?.pinyin})
-					</span>
-				{/if}
 			</span>
 		</div>
 	</div>
@@ -783,11 +845,35 @@
 			</div>
 		{/if}
 
+		<!-- Focused word panel -->
+		{#if focusedId !== null && !loading}
+			{@const fw = nodeById.get(focusedId)}
+			{#if fw}
+				<div class="absolute bottom-4 left-4 z-20 bg-base-100/90 backdrop-blur-sm rounded-xl px-3 py-2.5 shadow-lg border border-base-200 flex items-center gap-3 max-w-xs">
+					<span class="hanzi text-3xl font-bold text-primary leading-none">{fw.hanzi}</span>
+					<div class="flex-1 min-w-0">
+						<div class="font-medium text-sm leading-snug">{fw.pinyin}</div>
+						<div class="text-xs text-base-content/60 truncate leading-snug">{fw.english}</div>
+						<div class="flex items-center gap-2 mt-1">
+							<span
+								class="badge badge-xs font-semibold"
+								style="background-color: {hskColor(fw.hskLevel)}; color: #111"
+							>HSK {fw.hskLevel}</span>
+							<a
+								href="/search?q={encodeURIComponent(fw.hanzi)}"
+								class="text-xs text-primary/70 hover:text-primary transition-colors"
+							>details</a>
+						</div>
+					</div>
+				</div>
+			{/if}
+		{/if}
+
 		<!-- Legend -->
 		<div
 			class="absolute bottom-4 right-4 bg-base-100/80 backdrop-blur-sm rounded-xl p-2 text-xs text-base-content/40 pointer-events-none"
 		>
-			Tap: focus &nbsp; Pinch/Scroll: zoom &nbsp; Drag: pan
+			Tap: focus &nbsp; Scroll: zoom &nbsp; Drag: pan
 		</div>
 	</div>
 </div>
