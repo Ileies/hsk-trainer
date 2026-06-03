@@ -32,6 +32,7 @@
 		"@types/d3-force": "^3.0.10",
 		"@types/d3-quadtree": "^3.0.6",
 		"@types/node": "^25.9.1",
+		"@types/nodemailer": "^8.0.0",
 		"@vitest/browser-playwright": "^4.1.8",
 		"drizzle-kit": "^0.31.10",
 		"drizzle-orm": "^0.45.2",
@@ -58,6 +59,7 @@
 		"d3-quadtree": "^3.0.1",
 		"daisyui": "^5.5.20",
 		"marked": "^18.0.4",
+		"nodemailer": "^8.0.10",
 		"openai": "^6.41.0"
 	}
 }
