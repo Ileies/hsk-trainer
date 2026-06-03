@@ -36,7 +36,7 @@
 
 	$effect(() => {
 		search = data.q;
-		starred = data.mode === 'detail' ? data.word.starred : false;
+		starred = data.mode === 'detail' ? !!data.word.starred : false;
 	});
 
 	function handleSearchKeydown(e: KeyboardEvent) {

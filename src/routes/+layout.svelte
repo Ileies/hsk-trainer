@@ -2,13 +2,16 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { BookOpen, Sparkles, Settings, Search, Network, Home } from '@lucide/svelte';
+	import { BookOpen, Sparkles, Settings, Search, Network, Home, LogOut } from '@lucide/svelte';
 	import MapCanvas from '$lib/MapCanvas.svelte';
 
 	let { children, data } = $props();
 
 	let isMap = $derived(page.url.pathname === '/map');
 	let isDashboard = $derived(page.url.pathname === '/');
+	let isAuthPage = $derived(
+		page.url.pathname === '/login' || page.url.pathname.startsWith('/auth/')
+	);
 
 	let searchQuery = $state('');
 	let dropdown = $state<
@@ -88,7 +91,7 @@
 
 <div class="h-dvh flex flex-col bg-base-200">
 	<!-- Desktop header (hidden on mobile) -->
-	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0 hidden md:flex">
+	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0 {isAuthPage ? 'hidden' : 'hidden md:flex'}">
 		<div class="flex-none">
 			<a href="/" class="flex items-center gap-2 text-xl font-bold text-primary">
 				<BookOpen size={24} />
@@ -200,15 +203,31 @@
 			>
 				<Settings size={16} />
 			</a>
+			{#if data.user}
+				<div class="flex items-center gap-1 ml-1 border-l border-base-200 pl-3">
+					<span class="text-xs text-base-content/40 hidden lg:inline truncate max-w-[140px]" title={data.user.email}>
+						{data.user.email}
+					</span>
+					<form method="POST" action="/auth/logout">
+						<button
+							type="submit"
+							class="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-error"
+							title="Sign out"
+						>
+							<LogOut size={16} />
+						</button>
+					</form>
+				</div>
+			{/if}
 		</div>
 	</nav>
 
 	<!-- Map canvas - always mounted so it survives route changes -->
-	<div class="{isMap ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
+	<div class="{isMap && !isAuthPage ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
 		<MapCanvas words={data.words} />
 	</div>
 
-	{#if isMap}
+	{#if isMap && !isAuthPage}
 		{@render children()}
 	{:else}
 		<main class="flex-1 overflow-auto">
@@ -223,7 +242,7 @@
 	{/if}
 
 	<!-- Mobile search bar - only on dashboard, pinned above bottom nav -->
-	{#if isDashboard}
+	{#if isDashboard && !isAuthPage}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="fixed bottom-16 inset-x-0 bg-base-100 border-t border-base-200 px-4 py-2 z-40 md:hidden"
@@ -292,7 +311,7 @@
 	{/if}
 
 	<!-- Mobile bottom navigation -->
-	<nav class="fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-200 z-50 md:hidden">
+	<nav class="fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-200 z-50 md:hidden {isAuthPage ? 'hidden' : ''}">
 		<div class="flex h-16">
 			<a
 				href="/"

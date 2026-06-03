@@ -3,7 +3,8 @@ import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { explains } from '$lib/server/db/schema';
+import { explains, explainsCache } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 function levenshtein(a: string, b: string): number {
 	const m = a.length, n = b.length;
@@ -109,31 +110,60 @@ In 2-3 sentences: explain the mistake and how to remember the correct answer. Fo
 Then two example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (!locals.user) error(401, 'Unauthorized');
+	const userId = locals.user.id;
+
 	const key = env.OPENAI_KEY;
-	if (!key) throw error(500, 'OPENAI_KEY is not configured');
+	if (!key) error(500, 'OPENAI_KEY is not configured');
 
 	const { wordId, hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer } =
 		await request.json();
 
-	const openai = new OpenAI({ apiKey: key });
+	const isBlank = !userAnswer;
+	let explanation: string;
 
-	const prompt = userAnswer
-		? buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer)
-		: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel);
+	if (isBlank && wordId) {
+		const [cached] = await db
+			.select()
+			.from(explainsCache)
+			.where(eq(explainsCache.vocabId, wordId))
+			.limit(1);
 
-	const response = await openai.responses.create({
-		model: 'gpt-5.4-mini',
-		store: false,
-		service_tier: 'flex',
-		input: prompt
-	});
-
-	const explanation = response.output_text;
+		if (cached) {
+			explanation = cached.explanation;
+		} else {
+			const openai = new OpenAI({ apiKey: key });
+			const response = await openai.responses.create({
+				model: 'gpt-5.4-mini',
+				store: false,
+				service_tier: 'flex',
+				input: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
+			});
+			explanation = response.output_text;
+			await db
+				.insert(explainsCache)
+				.values({ vocabId: wordId, explanation })
+				.onConflictDoNothing();
+		}
+	} else {
+		const openai = new OpenAI({ apiKey: key });
+		const prompt = isBlank
+			? buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
+			: buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer);
+		const response = await openai.responses.create({
+			model: 'gpt-5.4-mini',
+			store: false,
+			service_tier: 'flex',
+			input: prompt
+		});
+		explanation = response.output_text;
+	}
 
 	if (wordId) {
 		await db.insert(explains).values({
 			vocabularyId: wordId,
+			userId,
 			hanzi,
 			pinyin,
 			english,

@@ -1,13 +1,21 @@
 import { json, error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { vocabulary } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { userWordState } from '$lib/server/db/schema';
 
-export async function POST({ request }) {
+export async function POST({ request, locals }) {
+	if (!locals.user) error(401, 'Unauthorized');
+	const userId = locals.user.id;
+
 	const { wordId, starred } = await request.json();
-	if (!wordId || typeof starred !== 'boolean') throw error(400, 'Invalid payload');
+	if (!wordId || typeof starred !== 'boolean') error(400, 'Invalid payload');
 
-	await db.update(vocabulary).set({ starred }).where(eq(vocabulary.id, wordId));
+	await db
+		.insert(userWordState)
+		.values({ userId, vocabId: wordId, starred })
+		.onConflictDoUpdate({
+			target: [userWordState.userId, userWordState.vocabId],
+			set: { starred }
+		});
 
 	return json({ ok: true });
 }

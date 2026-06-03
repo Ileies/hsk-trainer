@@ -3,8 +3,7 @@ import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { vocabulary } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { userWordState } from '$lib/server/db/schema';
 
 function levenshtein(a: string, b: string): number {
 	const m = a.length, n = b.length;
@@ -20,9 +19,12 @@ function levenshtein(a: string, b: string): number {
 	return dp[m][n];
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (!locals.user) error(401, 'Unauthorized');
+	const userId = locals.user.id;
+
 	const key = env.OPENAI_KEY;
-	if (!key) throw error(500, 'OPENAI_KEY is not configured');
+	if (!key) error(500, 'OPENAI_KEY is not configured');
 
 	const { wordId, hanzi, pinyinPlain, english, userAnswer } = await request.json();
 
@@ -36,22 +38,23 @@ export const POST: RequestHandler = async ({ request }) => {
 	const ratio = dist / maxLen;
 
 	async function accept() {
-		if (wordId)
+		if (wordId) {
 			await db
-				.update(vocabulary)
-				.set({ learned: true, learnedAt: new Date() })
-				.where(eq(vocabulary.id, wordId));
+				.insert(userWordState)
+				.values({ userId, vocabId: wordId, learned: true, learnedAt: new Date() })
+				.onConflictDoUpdate({
+					target: [userWordState.userId, userWordState.vocabId],
+					set: { learned: true, learnedAt: new Date() }
+				});
+		}
 		return json({ valid: 0, reason: null });
 	}
 
-	// Obvious typo: small edit distance relative to word length - no AI needed
 	if (dist === 1 && maxLen >= 5) return accept();
 	if (dist <= 2 && maxLen >= 8) return accept();
 
-	// Clearly too far off - skip the AI call
 	if (ratio >= 0.5) return json({ valid: 1, reason: null });
 
-	// Borderline: let the AI decide
 	const openai = new OpenAI({ apiKey: key });
 
 	const response = await openai.responses.create({
