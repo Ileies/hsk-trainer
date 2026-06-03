@@ -79,7 +79,10 @@
 	</p>
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 		{#each data.words as word}
-			<div class="card bg-base-100 shadow-sm border border-base-200 {data.showAll && !word.learned ? 'opacity-50' : ''}">
+			<a
+				href="/search?id={word.id}"
+				class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow {data.showAll && !word.learned ? 'opacity-50' : ''}"
+			>
 				<div class="card-body py-4 px-5 gap-2">
 					<div class="flex items-start justify-between gap-2">
 						<div class="flex gap-1.5 flex-wrap">
@@ -97,6 +100,7 @@
 									type="submit"
 									class="btn btn-ghost btn-xs gap-1"
 									title="Remove from finished"
+									onclick={(e) => e.stopPropagation()}
 								>
 									<RotateCcw size={12} />
 									<span class="text-xs">Relearn</span>
@@ -108,7 +112,7 @@
 					<div class="text-primary font-medium tracking-wide">{word.pinyin}</div>
 					<div class="text-base-content/60 text-sm">{word.english}</div>
 				</div>
-			</div>
+			</a>
 		{/each}
 	</div>
 {/if}
