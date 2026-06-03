@@ -17,6 +17,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-mini',
 		store: false,
+		service_tier: 'flex',
 		input: `You are writing the English translation for an HSK Chinese flashcard.
 
 Card:

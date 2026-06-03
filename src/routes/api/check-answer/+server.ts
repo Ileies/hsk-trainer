@@ -57,6 +57,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const response = await openai.responses.create({
 		model: 'gpt-5.4-nano',
 		store: false,
+		service_tier: 'flex',
 		reasoning: { effort: 'none' },
 		max_output_tokens: 32,
 		input: `Pinyin typo check.
