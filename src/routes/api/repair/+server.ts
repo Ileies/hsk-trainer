@@ -6,7 +6,10 @@ import { db } from '$lib/server/db';
 import { vocabulary } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	const adminEmail = env.ADMIN_MAIL;
+	if (!adminEmail || locals.user?.email !== adminEmail) error(403, 'Forbidden');
+
 	const key = env.OPENAI_KEY;
 	if (!key) throw error(500, 'OPENAI_KEY is not configured');
 
