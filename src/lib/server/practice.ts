@@ -9,6 +9,8 @@ export type PracticeWord = {
 	pinyinPlain: string;
 	english: string;
 	hskLevel: number;
+	mistakeCount: number;
+	isNew: boolean;
 	exampleSentences: string | null;
 	starred: boolean;
 };
@@ -36,6 +38,8 @@ export function serializePracticeWord(word: typeof vocabulary.$inferSelect): Pra
 		pinyinPlain: word.pinyinPlain,
 		english: word.english,
 		hskLevel: word.hskLevel,
+		mistakeCount: word.mistakeCount,
+		isNew: word.seenAt === null,
 		exampleSentences: word.exampleSentences,
 		starred: word.starred
 	};
@@ -100,6 +104,13 @@ export async function getPracticeData(
 		.select({ total: sql<number>`count(*)` })
 		.from(vocabulary)
 		.where(hsk ? eq(vocabulary.hskLevel, hsk) : undefined);
+
+	if (word && word.seenAt === null) {
+		await db
+			.update(vocabulary)
+			.set({ seenAt: new Date() })
+			.where(eq(vocabulary.id, word.id));
+	}
 
 	const needsReset = !word && remaining > 0 && excludeIds.length > 0;
 

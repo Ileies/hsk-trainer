@@ -31,6 +31,8 @@ export const vocabulary = sqliteTable(
 		learned: integer('learned', { mode: 'boolean' }).notNull().default(false),
 		learnedAt: integer('learned_at', { mode: 'timestamp' }),
 		starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
+		mistakeCount: integer('mistake_count').notNull().default(0),
+		seenAt: integer('seen_at', { mode: 'timestamp' }),
 		exampleSentences: text('example_sentences')
 	},
 	(table) => ({

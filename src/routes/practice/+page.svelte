@@ -393,9 +393,15 @@
 		<div class="card-body gap-6 px-8 py-10">
 			<!-- Word info badges -->
 			<div class="flex gap-2">
-				<span class="badge {LEVEL_COLORS[currentWord.hskLevel - 1]} badge-sm">
-					HSK {currentWord.hskLevel}
-				</span>
+				{#if currentWord.isNew}
+					<span class="badge badge-info badge-sm">New</span>
+				{:else if !practiceSession.hsk && currentWord.mistakeCount >= 3}
+					<span class="badge badge-error badge-sm">Hard</span>
+				{:else}
+					<span class="badge {LEVEL_COLORS[currentWord.hskLevel - 1]} badge-sm">
+						HSK {currentWord.hskLevel}
+					</span>
+				{/if}
 			</div>
 
 			<!-- English prompt -->
@@ -727,9 +733,15 @@
 
 			<!-- Badges -->
 			<div class="flex justify-center gap-2">
-				<span class="badge {LEVEL_COLORS[practiceSession.result.word.hskLevel - 1]} badge-sm">
-					HSK {practiceSession.result.word.hskLevel}
-				</span>
+				{#if practiceSession.result.word.isNew}
+					<span class="badge badge-info badge-sm">New</span>
+				{:else if !practiceSession.hsk && practiceSession.result.word.mistakeCount >= 3}
+					<span class="badge badge-error badge-sm">Hard</span>
+				{:else}
+					<span class="badge {LEVEL_COLORS[practiceSession.result.word.hskLevel - 1]} badge-sm">
+						HSK {practiceSession.result.word.hskLevel}
+					</span>
+				{/if}
 			</div>
 
 			<button class="btn gap-2 btn-primary" onclick={next} disabled={loading}>

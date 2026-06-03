@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { vocabulary } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import {
 	getPracticeData,
@@ -44,6 +44,11 @@ export const actions: Actions = {
 			await db
 				.update(vocabulary)
 				.set({ learned: true, learnedAt: new Date() })
+				.where(eq(vocabulary.id, wordId));
+		} else {
+			await db
+				.update(vocabulary)
+				.set({ mistakeCount: sql`${vocabulary.mistakeCount} + 1` })
 				.where(eq(vocabulary.id, wordId));
 		}
 

@@ -8,6 +8,8 @@ export type WordResult = {
 		pinyinPlain: string;
 		english: string;
 		hskLevel: number;
+		mistakeCount: number;
+		isNew: boolean;
 		exampleSentences: string | null;
 		starred: boolean;
 	};
