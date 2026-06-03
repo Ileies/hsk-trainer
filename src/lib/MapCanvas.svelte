@@ -146,10 +146,8 @@
 		const connectedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) > 0);
 		const isolatedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) === 0);
 
-		// Simulation runs on connected nodes only. Isolated nodes never enter the simulation -
-		// their positions are placed deterministically after we know where the cluster settled,
-		// so they can never form force-equilibrium rings.
-		const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ≈ 2.399963 rad
+		// Phase 1: simulate connected nodes. Phase 2: spread isolated nodes with pure repulsion.
+		const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 		const spiralScale = 20;
 		const connSimNodes: SimNode[] = connectedWords.map((w, i) => ({
 			...w,
@@ -179,42 +177,72 @@
 			.force('center', forceCenter(0, 0))
 			.stop();
 
+		// 1/d² repulsion from cluster center - no equilibrium radius, no ring
+		function forceClusterRepel(strength: number) {
+			let ns: SimNode[] = [];
+			function repel(alpha: number) {
+				for (const n of ns) {
+					const x = n.x ?? 0, y = n.y ?? 0;
+					const d2 = x * x + y * y;
+					if (d2 < 1) continue;
+					const k = (strength * alpha) / (Math.sqrt(d2) * d2);
+					n.vx = (n.vx ?? 0) + x * k;
+					n.vy = (n.vy ?? 0) + y * k;
+				}
+			}
+			(repel as any).initialize = (newNodes: SimNode[]) => { ns = newNodes; };
+			return repel;
+		}
+
 		const TOTAL = 400;
+		const ISO_TOTAL = 300;
 		const CHUNK = 15;
 		let done = 0;
+		let phase = 1;
+		let isoSimNodes: SimNode[] = [];
+		let isoSim: { tick: () => void } | null = null;
 
 		function tick() {
-			const end = Math.min(done + CHUNK, TOTAL);
-			for (let i = done; i < end; i++) sim.tick();
-			done = end;
-			if (done < TOTAL) {
+			if (phase === 1) {
+				const end = Math.min(done + CHUNK, TOTAL);
+				for (let i = done; i < end; i++) sim.tick();
+				done = end;
+				if (done < TOTAL) { setTimeout(tick, 0); return; }
+
+				const cx = connSimNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connSimNodes.length;
+				const cy = connSimNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connSimNodes.length;
+				for (const n of connSimNodes) { n.x = (n.x ?? 0) - cx; n.y = (n.y ?? 0) - cy; }
+
+				const clusterR = connSimNodes.reduce(
+					(r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)), 0
+				);
+
+				// Start isolated nodes just outside the cluster at golden-angle positions,
+				// then let mutual repulsion + cluster repulsion spread them - no gravity,
+				// so they can never settle into a ring equilibrium
+				const isoStartR = clusterR + 20;
+				isoSimNodes = isolatedWords.map((w, i) => ({
+					...w,
+					x: isoStartR * Math.cos(i * goldenAngle),
+					y: isoStartR * Math.sin(i * goldenAngle),
+					degree: 0
+				}));
+
+				isoSim = forceSimulation<SimNode>(isoSimNodes)
+					.force('charge', forceManyBody<SimNode>().strength(-50))
+					.force('clusterRepel', forceClusterRepel(connSimNodes.length * 120))
+					.stop();
+
+				phase = 2;
+				done = 0;
 				setTimeout(tick, 0);
 				return;
 			}
 
-			// Center the connected cluster
-			const cx = connSimNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connSimNodes.length;
-			const cy = connSimNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connSimNodes.length;
-			for (const n of connSimNodes) {
-				n.x = (n.x ?? 0) - cx;
-				n.y = (n.y ?? 0) - cy;
-			}
-
-			// Measure actual cluster boundary after simulation has settled
-			const clusterR = connSimNodes.reduce(
-				(r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)),
-				0
-			);
-
-			// Place isolated nodes in a Fermat spiral starting just outside the cluster.
-			// sqrt(i+1) expansion gives naturally decreasing density outward - no ring possible.
-			const innerR = clusterR + 30;
-			const isoSimNodes: SimNode[] = isolatedWords.map((w, i) => ({
-				...w,
-				x: (innerR + 12 * Math.sqrt(i + 1)) * Math.cos(i * goldenAngle),
-				y: (innerR + 12 * Math.sqrt(i + 1)) * Math.sin(i * goldenAngle),
-				degree: 0
-			}));
+			const end = Math.min(done + CHUNK, ISO_TOTAL);
+			for (let i = done; i < end; i++) isoSim!.tick();
+			done = end;
+			if (done < ISO_TOTAL) { setTimeout(tick, 0); return; }
 
 			const allNodes = [...connSimNodes, ...isoSimNodes];
 			const allById = new Map(allNodes.map((n) => [n.id, n]));
