@@ -44,7 +44,12 @@
 							type="text"
 							name="pin"
 							inputmode="numeric"
-							maxlength="13"
+							pattern="\d{6}"
+							maxlength="6"
+							oninput={(e) => {
+								const el = e.currentTarget as HTMLInputElement;
+								el.value = el.value.replace(/\s/g, '');
+							}}
 							placeholder="123456"
 							autocomplete="one-time-code"
 							autofocus
