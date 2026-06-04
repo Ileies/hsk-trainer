@@ -41,6 +41,12 @@
 	const remaining = $derived(practiceSession.remaining);
 	const total = $derived(practiceSession.total);
 
+	const maskedExampleSentences = $derived.by(() => {
+		if (!currentWord?.exampleSentences || !currentWord.pinyin) return currentWord?.exampleSentences ?? null;
+		const escaped = currentWord.pinyin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		return currentWord.exampleSentences.replace(new RegExp(escaped, 'gi'), '[...]');
+	});
+
 	// Initialise aiCheck from localStorage once on component mount
 	$effect(() => {
 		const stored = localStorage.getItem('aiCheck');
@@ -590,7 +596,7 @@
 				<div class="border-t border-base-200 pt-4">
 					{#if practiceSession.showHint}
 						<div class="text-sm leading-relaxed whitespace-pre-line text-base-content/70">
-							{currentWord.exampleSentences}
+							{maskedExampleSentences}
 						</div>
 						<button
 							class="btn mt-2 text-base-content/40 btn-ghost btn-xs"
