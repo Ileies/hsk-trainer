@@ -48,7 +48,7 @@
 							maxlength="6"
 							oninput={(e) => {
 								const el = e.currentTarget as HTMLInputElement;
-								el.value = el.value.replace(/\s/g, '');
+								el.value = el.value.replace(/\D/g, '');
 							}}
 							placeholder="123456"
 							autocomplete="one-time-code"
