@@ -59,13 +59,14 @@
 
 				<div class="divider text-xs text-base-content/30">or</div>
 
-				<form method="POST">
+				<form method="POST" action="?/send">
+					<input type="hidden" name="email" value={form?.email} />
 					<button type="submit" class="btn btn-ghost btn-sm w-full text-base-content/50">
 						Send a new link
 					</button>
 				</form>
 			{:else}
-				<form method="POST" class="flex flex-col gap-4">
+				<form method="POST" action="?/send" class="flex flex-col gap-4">
 					{#if form?.error}
 						<div class="alert alert-error text-sm">
 							<span>{form.error}</span>
