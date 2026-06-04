@@ -2,7 +2,7 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { BookOpen, Sparkles, Settings, Search, Network, Home, LogOut } from '@lucide/svelte';
+	import { BookOpen, Sparkles, Settings, Search, Network, Home, LogOut, User } from '@lucide/svelte';
 	import MapCanvas from '$lib/MapCanvas.svelte';
 
 	let { children, data } = $props();
@@ -205,9 +205,11 @@
 			</a>
 			{#if data.user}
 				<div class="flex items-center gap-1 ml-1 border-l border-base-200 pl-3">
-					<span class="text-xs text-base-content/40 hidden lg:inline truncate max-w-[140px]" title={data.user.email}>
-						{data.user.email}
-					</span>
+					<div class="tooltip tooltip-bottom" data-tip={data.user.email}>
+						<span class="btn btn-ghost btn-sm btn-square text-base-content/40 cursor-default">
+							<User size={16} />
+						</span>
+					</div>
 					<form method="POST" action="/auth/logout">
 						<button
 							type="submit"
