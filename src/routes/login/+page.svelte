@@ -44,8 +44,7 @@
 							type="text"
 							name="pin"
 							inputmode="numeric"
-							pattern="\d{6}"
-							maxlength="6"
+							maxlength="13"
 							placeholder="123456"
 							autocomplete="one-time-code"
 							autofocus
