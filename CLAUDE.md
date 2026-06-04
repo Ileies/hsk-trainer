@@ -16,7 +16,31 @@ A self-hosted SvelteKit flashcard app for learning Chinese vocabulary from the o
 
 ## Database schema
 
-Two tables, defined in `src/lib/server/db/schema.ts`:
+All tables are defined in `src/lib/server/db/schema.ts`.
+
+**`users`** - registered accounts
+| Column | Type | Notes |
+|---|---|---|
+| `id` | integer PK | auto-increment |
+| `email` | text | unique |
+| `created_at` | timestamp | |
+
+**`auth_tokens`** - login tokens (magic link + PIN)
+| Column | Type | Notes |
+|---|---|---|
+| `id` | integer PK | |
+| `user_id` | integer | FK to users |
+| `token` | text | 64-char hex; used in magic link URL |
+| `pin` | text nullable | 6-digit numeric PIN sent in same email |
+| `expires_at` | timestamp | 15 minutes from issue |
+| `used` | boolean | set to `true` on first use |
+
+**`sessions`**
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text PK | 64-char hex |
+| `user_id` | integer | FK to users |
+| `expires_at` | timestamp | 30 days from login |
 
 **`vocabulary`** - the HSK word list
 | Column | Type | Notes |
@@ -27,27 +51,66 @@ Two tables, defined in `src/lib/server/db/schema.ts`:
 | `pinyin_plain` | text | stripped tones, lowercase (e.g. `ni hao`) - this is what answers are checked against |
 | `english` | text | definition; multiple meanings separated by `, ` |
 | `hsk_level` | integer | 1-6 |
-| `topic` | text nullable | auto-detected category (e.g. `food & drink`, `transport`) |
-| `learned` | boolean | set to `true` when answered correctly or when AI confirms a typo |
-| `learned_at` | timestamp nullable | when it was marked learned |
-| `starred` | boolean | user bookmark |
-| `example_sentences` | text nullable | two pinyin sentences separated by `\n` |
+| `example_sentences` | text nullable | AI-generated sentences (pinyin + english pairs, `\n`-separated) |
 
-**`explains`** - saved AI explanations for wrong answers
+**`user_word_state`** - per-user progress (one row per user+word pair)
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | integer | composite PK with `vocab_id` |
+| `vocab_id` | integer | FK into vocabulary |
+| `learned` | boolean | |
+| `learned_at` | timestamp nullable | |
+| `starred` | boolean | user bookmark |
+| `mistake_count` | integer | incremented on wrong answers |
+| `seen_at` | timestamp nullable | first time the card was shown; null means the word is new |
+
+**`explains`** - saved AI explanations for wrong answers (shared across users, de-duped by vocab+answer)
 | Column | Type | Notes |
 |---|---|---|
 | `id` | integer PK | |
-| `vocabulary_id` | integer | FK into vocabulary (not a hard constraint) |
-| `hanzi/pinyin/english` | text | snapshot of the word at time of explanation |
+| `vocabulary_id` | integer | |
+| `hanzi/pinyin/english` | text | snapshot at time of explanation |
 | `user_answer` | text | what the user typed |
 | `explanation` | text | AI-generated Markdown |
 | `created_at` | timestamp | |
+
+**`explains_users`** - junction table: which users have seen which explain
+| Column | Type | Notes |
+|---|---|---|
+| `explain_id` | integer | composite PK with `user_id` |
+| `user_id` | integer | |
+
+**`explains_cache`** - one cached explanation per vocabulary word
+| Column | Type | Notes |
+|---|---|---|
+| `vocab_id` | integer PK | |
+| `explanation` | text | |
+| `created_at` | timestamp | |
+
+## Authentication
+
+The app is fully protected: `src/hooks.server.ts` checks the `session` cookie on every request and redirects to `/login` if the session is missing or expired.
+
+**Login flow:**
+1. User enters their email on `/login`
+2. Server creates an `auth_tokens` row (token + 6-digit PIN, 15-minute expiry) and sends an email via Nodemailer
+3. User either clicks the magic link (`/auth/verify?token=...`) or enters the PIN on the next screen
+4. A 30-day session is created and stored in `sessions`; the `session` cookie is set
+
+New users are automatically created on first login - there is no separate registration step.
+
+`locals.user` is `{ id, email }` or `null` on every server load/action. The layout server passes `user` to the client as `data.user`.
+
+**Admin-only endpoints:** `ADMIN_MAIL` env var - if set, only that email may call `POST /api/repair`.
 
 ## Route map
 
 | Route | Purpose |
 |---|---|
-| `/` | Dashboard: per-level progress cards + topic badges |
+| `/login` | Passwordless login: enter email, then magic link or PIN |
+| `/auth/verify` | Magic link callback - validates token, creates session |
+| `/auth/logout` | Destroys session cookie and redirects to `/login` |
+| `/` | Dashboard: per-level progress cards |
 | `/practice` | Flashcard loop (main feature - see below) |
 | `/finished` | Grid of learned words; allows un-learning |
 | `/search` | Full-text search (hanzi / pinyin / english); word detail view |
@@ -58,7 +121,7 @@ Two tables, defined in `src/lib/server/db/schema.ts`:
 | `GET /api/search` | Typeahead search used by navbar and word map (`?q=&limit=`) |
 | `POST /api/check-answer` | AI typo check - returns `{valid: 0|1, reason}` |
 | `POST /api/explain` | AI explanation - saves to DB, returns `{explanation}` |
-| `POST /api/repair` | AI flashcard repair - updates `vocabulary.english` in DB, returns `{english}` |
+| `POST /api/repair` | AI flashcard repair (admin only) - updates `vocabulary.english` in DB, returns `{english}` |
 | `POST /api/star` | Toggle star - body `{wordId, starred}` |
 | `GET /api/practice-next` | Next word for client-side session navigation |
 
@@ -66,7 +129,6 @@ Two tables, defined in `src/lib/server/db/schema.ts`:
 
 **URL params act as session state:**
 - `?hsk=N` - filter to HSK level N
-- `?topic=X` - filter to topic X
 - `?exclude=1,2,3` - comma-separated IDs already seen this session (excluded from random pick)
 - `?last=N` - ID of the last shown word (also soft-excluded to avoid repeats)
 
@@ -81,13 +143,17 @@ Two tables, defined in `src/lib/server/db/schema.ts`:
 3. If `valid === 0` (typo), mark as correct + mark learned in DB; show "You could have also typed: ..."
 4. If `valid === 1`, show as wrong with optional `reason` text
 
-**`learned` flag is set in two places:**
+**`learned` flag is set in two places** (in `user_word_state` for the current user):
 - Server action `?/answer` on a correct string match
 - `/api/check-answer` when the AI declares a typo
 
+**`mistake_count`** is incremented in `user_word_state` on every wrong answer (including AI-confirmed wrong answers).
+
 ## Root layout - important gotcha
 
-`src/routes/+layout.server.ts` loads **the entire vocabulary** (id, hanzi, pinyin, english, hskLevel only) on every page load and passes it as `data.words`. This feeds the `MapCanvas` component, which is always mounted in the layout (hidden via CSS when not on `/map`) to preserve simulation state across navigation. Avoid querying the full vocabulary elsewhere if you can reuse this data.
+`src/routes/+layout.server.ts` loads **the entire vocabulary** (id, hanzi, pinyin, english, hskLevel only) on every page load and passes it as `data.words`. It also passes `data.user` (the current user object). This feeds the `MapCanvas` component, which is always mounted in the layout (hidden via CSS when not on `/map`) to preserve simulation state across navigation. Avoid querying the full vocabulary elsewhere if you can reuse this data.
+
+On auth pages (`/login`, `/auth/*`) the layout skips the vocabulary query and returns `{ words: [], user: locals.user }`.
 
 ## Word map
 
@@ -112,18 +178,25 @@ All three API routes use `openai.responses.create` (not `chat.completions`), wit
 
 All three return 500 if `OPENAI_KEY` is unset. The UI handles this gracefully (buttons just fail silently or show an error state).
 
-## Seed script
+## Scripts
 
-`scripts/seed.ts` reads `scripts/vocabulary-data.json` (5,000 entries exported from the canonical database) and upserts into the database - skips existing `hanzi:hskLevel` pairs, so it is safe to run on an already-populated DB. Run with `bun run db:seed`.
+**`scripts/generate-sentences.ts`** - AI-generates example sentences for vocabulary words that have none. Uses OpenAI with concurrency 20, writes results back to `vocabulary.example_sentences`. Run with `bun scripts/generate-sentences.ts [--limit N]`.
 
-`vocabulary-data.json` is the source of truth for the vocabulary. It contains `hanzi`, `pinyin`, `pinyin_plain`, `english`, `hsk_level`, `topic`, and `example_sentences` for all 5,000 words. There are no CSV source files.
+**`scripts/deploy.ts`** - compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), restarts via PM2. Run via `bun run deploy`.
+
+**Migration scripts** (one-time, keep for reference):
+- `scripts/migrate-multiuser.ts` - added users/sessions/userWordState tables
+- `scripts/migrate-explains-junction.ts` - replaced `explains.user_id` column with `explains_users` junction table
 
 ## Common tasks
 
-**Add a new column to vocabulary:**
+**Add a new column to `vocabulary`:**
 1. Edit `src/lib/server/db/schema.ts`
 2. Run `bun run db:push`
 3. Update `serializePracticeWord` in `src/lib/server/practice.ts` if it needs to reach the client
+
+**Add a new per-user state column:**
+Add it to `user_word_state` in `schema.ts`, then `bun run db:push`. The `wordWithStateSelect` helper in `practice.ts` uses `coalesce(column, default)` so left-joining users without a row still works.
 
 **Add a new API endpoint:**
 Create `src/routes/api/<name>/+server.ts`, export named handlers (`GET`, `POST`, etc.)
@@ -147,6 +220,8 @@ bun run build && bun run deploy
 ```
 Compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), and restarts via PM2. Configured in `scripts/deploy.ts`.
 
+**Required env vars for production:** `DATABASE_URL`, `SMTP_HOST`, and at least `SMTP_FROM`. Optional: `OPENAI_KEY`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `ADMIN_MAIL`.
+
 **Inspect the database:**
 ```bash
 bun run db:studio
@@ -158,3 +233,5 @@ bun run db:studio
 - Server-only code lives under `src/lib/server/` - never import from there in `.svelte` files directly (only via load functions or API routes)
 - English translations use `, ` to separate meanings (not `;` or `/`)
 - Pinyin with tones = `pinyin` column; without tones lowercase = `pinyinPlain` column - keep both in sync
+- All protected routes rely on `locals.user` being populated by `hooks.server.ts`; never bypass this check manually
+- Per-user progress always reads from / writes to `user_word_state`, never directly on `vocabulary`

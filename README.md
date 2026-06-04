@@ -4,10 +4,15 @@ A self-hosted flashcard web app for learning Chinese vocabulary from the officia
 
 ## Features
 
+**Multi-user / authentication**
+- Passwordless login via email magic link or 6-digit PIN
+- Each user has their own progress, starred words, and explanations
+- Sessions last 30 days; all protected pages redirect to `/login` when unauthenticated
+
 **Practice**
 - Flashcard loop: English prompt, you type the pinyin (without tone marks)
 - AI typo check distinguishes genuine mistakes from slips (wrong key, transposed letter, etc.)
-- Filter practice sessions by HSK level (1-6) or topic category
+- Filter practice sessions by HSK level (1-6)
 - Session progress bar and remaining-word counter
 - Skip a card without marking it as learned
 - Star any word for later review
@@ -15,7 +20,7 @@ A self-hosted flashcard web app for learning Chinese vocabulary from the officia
 **AI assistance** (requires OpenAI key)
 - Smart answer grading: borderline answers are sent to GPT for a second opinion
 - Explain button: 2-3 sentence explanation of why your answer was wrong, with a memory tip
-- Repair flashcard: ask the AI to correct an English translation it judges to be wrong
+- Repair flashcard: ask the AI to correct an English translation (admin-only)
 - All explanations are saved and accessible from the Explanations page
 
 **Word Map**
@@ -39,6 +44,7 @@ A self-hosted flashcard web app for learning Chinese vocabulary from the officia
 | Styling | [Tailwind CSS v4](https://tailwindcss.com) + [DaisyUI v5](https://daisyui.com) |
 | Database | SQLite via [Drizzle ORM](https://orm.drizzle.team) + [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
 | AI | [OpenAI SDK](https://github.com/openai/openai-node) (gpt-5.4-nano for grading, gpt-5.4-mini for explanations) |
+| Email | [Nodemailer](https://nodemailer.com) (magic link + PIN delivery) |
 | Visualisation | [d3-force](https://d3js.org/d3-force) + [d3-quadtree](https://d3js.org/d3-quadtree), rendered on Canvas |
 | Adapter | `@sveltejs/adapter-node` (standalone Node/Bun server) |
 
@@ -75,6 +81,13 @@ Open [http://localhost:5173](http://localhost:5173).
 |---|---|---|
 | `DATABASE_URL` | Yes | Path to the SQLite file (default: `local.db`) |
 | `OPENAI_KEY` | No | OpenAI API key. AI features are disabled when unset. |
+| `SMTP_HOST` | Yes | SMTP server hostname for sending login emails |
+| `SMTP_PORT` | No | SMTP port (default: `587`) |
+| `SMTP_SECURE` | No | Set to `true` for TLS (port 465); default `false` |
+| `SMTP_USER` | No | SMTP auth username (omit for unauthenticated relay) |
+| `SMTP_PASS` | No | SMTP auth password |
+| `SMTP_FROM` | No | From address (defaults to `noreply@<hostname>`) |
+| `ADMIN_MAIL` | No | Email address that may use the flashcard repair endpoint |
 
 ## Scripts
 
@@ -88,7 +101,7 @@ Open [http://localhost:5173](http://localhost:5173).
 | `bun run format` | Auto-format all files |
 | `bun run test` | Run unit tests with Vitest |
 | `bun run db:push` | Push schema changes to the database |
-| `bun run db:seed` | Import HSK CSV files into the database |
+| `bun run db:seed` | Seed vocabulary from `scripts/seed.ts` |
 | `bun run db:studio` | Open Drizzle Studio (visual DB browser) |
 | `bun run deploy` | Deploy to the production server via SSH |
 
@@ -96,16 +109,24 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ```
 src/
+  hooks.server.ts           # Session validation; redirects unauthenticated requests to /login
   lib/
     MapCanvas.svelte        # Canvas-based force-directed word graph
     mapGraph.ts             # Graph construction and BFS for the word map
+    app.svelte.ts           # Module-level $state for cross-navigation session data
     server/
+      auth.ts               # Token / PIN / session generation helpers
+      email.ts              # Nodemailer - sends magic link + PIN emails
       db/
         index.ts            # Drizzle client
-        schema.ts           # vocabulary + explains tables
+        schema.ts           # All DB tables (see Database schema below)
       practice.ts           # Practice query logic (word selection, progress counts)
   routes/
     +page                   # Dashboard
+    login/                  # Passwordless login (email -> magic link or PIN)
+    auth/
+      verify/               # Magic link callback - creates session
+      logout/               # Destroys session cookie
     practice/               # Flashcard practice
     finished/               # Review learned words
     search/                 # Vocabulary search
@@ -116,14 +137,13 @@ src/
     api/
       check-answer/         # AI typo vs. genuine mistake grading
       explain/              # AI explanation for a wrong answer
-      repair/               # AI flashcard repair
+      repair/               # AI flashcard repair (admin only)
       practice-next/        # Next word for the practice session
       search/               # Search endpoint (used by the word map)
       star/                 # Toggle star on a word
 scripts/
-  seed.ts                   # Parses HSK CSVs and inserts vocabulary
-static/
-  hsk1.csv - hsk6.csv       # Official HSK word lists (hanzi, pinyin, English)
+  generate-sentences.ts     # AI-generates example sentences and writes them to the DB
+  deploy.ts                 # SCP deploy to production
 ```
 
 ## Production Deployment
