@@ -12,6 +12,7 @@ export const authTokens = sqliteTable('auth_tokens', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	userId: integer('user_id').notNull(),
 	token: text('token').notNull().unique(),
+	pin: text('pin'),
 	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
 	used: integer('used', { mode: 'boolean' }).notNull().default(false)
 });

@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import { env } from '$env/dynamic/private';
 
-export async function sendMagicLink(toEmail: string, token: string, origin: string) {
+export async function sendMagicLink(toEmail: string, token: string, pin: string, origin: string) {
 	const transporter = nodemailer.createTransport({
 		host: env.SMTP_HOST,
 		port: parseInt(env.SMTP_PORT ?? '587'),
@@ -20,9 +20,11 @@ export async function sendMagicLink(toEmail: string, token: string, origin: stri
 		from: env.SMTP_FROM ?? `noreply@${new URL(origin).hostname}`,
 		to: toEmail,
 		subject: 'Sign in to HSK Trainer',
-		text: `Click this link to sign in:\n\n${url}\n\nThis link expires in 15 minutes.`,
-		html: `<p>Click <a href="${url}">here to sign in</a> to HSK Trainer.</p>
-<p style="color:#888;font-size:0.9em">Or copy this link: ${url}</p>
-<p style="color:#888;font-size:0.9em">This link expires in 15 minutes.</p>`
+		text: `Your sign-in PIN is: ${pin}\n\nOr click this link to sign in directly:\n${url}\n\nBoth expire in 15 minutes.`,
+		html: `
+<p style="font-size:1.1em">Your sign-in PIN:</p>
+<p style="font-size:2.5em;font-weight:bold;letter-spacing:0.2em;font-family:monospace">${pin}</p>
+<p>Or <a href="${url}">click here to sign in</a> directly.</p>
+<p style="color:#888;font-size:0.85em">Both expire in 15 minutes. If you didn't request this, ignore this email.</p>`
 	});
 }

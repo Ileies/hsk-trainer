@@ -17,13 +17,53 @@
 					<BookOpen size={40} />
 				</div>
 				<h1 class="text-2xl font-bold">HSK Trainer</h1>
-				<p class="text-base-content/60 text-sm">Enter your email to receive a sign-in link.</p>
+				{#if form?.sent}
+					<p class="text-base-content/60 text-sm">
+						Check your inbox at <strong>{form.email}</strong> and enter the PIN below, or click the
+						link in the email.
+					</p>
+				{:else}
+					<p class="text-base-content/60 text-sm">Enter your email to receive a sign-in link.</p>
+				{/if}
 			</div>
 
 			{#if form?.sent}
-				<div class="alert alert-success">
-					<span>Check your inbox - a sign-in link was sent to <strong>{form.email}</strong>.</span>
-				</div>
+				<form method="POST" action="?/pin" class="flex flex-col gap-4">
+					<input type="hidden" name="email" value={form.email} />
+
+					{#if form?.pinError}
+						<div class="alert alert-error text-sm">
+							<span>{form.pinError}</span>
+						</div>
+					{/if}
+
+					<fieldset class="fieldset">
+						<legend class="fieldset-legend">6-digit PIN</legend>
+						<!-- svelte-ignore a11y_autofocus -->
+						<input
+							type="text"
+							name="pin"
+							inputmode="numeric"
+							pattern="\d{6}"
+							maxlength="6"
+							placeholder="123456"
+							autocomplete="one-time-code"
+							autofocus
+							required
+							class="input input-bordered w-full text-center text-2xl tracking-widest font-mono"
+						/>
+					</fieldset>
+
+					<button type="submit" class="btn btn-primary w-full">Sign in</button>
+				</form>
+
+				<div class="divider text-xs text-base-content/30">or</div>
+
+				<form method="POST">
+					<button type="submit" class="btn btn-ghost btn-sm w-full text-base-content/50">
+						Send a new link
+					</button>
+				</form>
 			{:else}
 				<form method="POST" class="flex flex-col gap-4">
 					{#if form?.error}
