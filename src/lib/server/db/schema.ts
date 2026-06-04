@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -34,7 +34,6 @@ export const explains = sqliteTable(
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		vocabularyId: integer('vocabulary_id').notNull(),
-		userId: integer('user_id').notNull(),
 		hanzi: text('hanzi').notNull(),
 		pinyin: text('pinyin').notNull(),
 		english: text('english').notNull(),
@@ -46,7 +45,18 @@ export const explains = sqliteTable(
 	},
 	(table) => ({
 		vocabIdx: index('explains_vocab_idx').on(table.vocabularyId),
-		userIdx: index('explains_user_idx').on(table.userId)
+		vocabAnswerUniq: uniqueIndex('explains_vocab_answer_uniq').on(table.vocabularyId, table.userAnswer)
+	})
+);
+
+export const explainsUsers = sqliteTable(
+	'explains_users',
+	{
+		explainId: integer('explain_id').notNull(),
+		userId: integer('user_id').notNull()
+	},
+	(t) => ({
+		pk: primaryKey({ columns: [t.explainId, t.userId] })
 	})
 );
 

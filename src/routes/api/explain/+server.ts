@@ -3,8 +3,8 @@ import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { explains, explainsCache } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { explains, explainsCache, explainsUsers } from '$lib/server/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 function levenshtein(a: string, b: string): number {
 	const m = a.length, n = b.length;
@@ -147,30 +147,56 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				.onConflictDoNothing();
 		}
 	} else {
-		const openai = new OpenAI({ apiKey: key });
-		const prompt = isBlank
-			? buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
-			: buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer);
-		const response = await openai.responses.create({
-			model: 'gpt-5.4-mini',
-			store: false,
-			service_tier: 'flex',
-			input: prompt
-		});
-		explanation = response.output_text;
+		if (wordId && userAnswer) {
+			const [cached] = await db
+				.select({ explanation: explains.explanation })
+				.from(explains)
+				.where(and(eq(explains.vocabularyId, wordId), eq(explains.userAnswer, userAnswer)))
+				.limit(1);
+			if (cached) {
+				explanation = cached.explanation;
+			} else {
+				const openai = new OpenAI({ apiKey: key });
+				const response = await openai.responses.create({
+					model: 'gpt-5.4-mini',
+					store: false,
+					service_tier: 'flex',
+					input: buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer)
+				});
+				explanation = response.output_text;
+			}
+		} else {
+			const openai = new OpenAI({ apiKey: key });
+			const response = await openai.responses.create({
+				model: 'gpt-5.4-mini',
+				store: false,
+				service_tier: 'flex',
+				input: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
+			});
+			explanation = response.output_text;
+		}
 	}
 
 	if (wordId) {
-		await db.insert(explains).values({
-			vocabularyId: wordId,
-			userId,
-			hanzi,
-			pinyin,
-			english,
-			userAnswer: userAnswer || '',
-			explanation,
-			createdAt: new Date()
-		});
+		const normalizedAnswer = userAnswer || '';
+		const row = await db
+			.insert(explains)
+			.values({ vocabularyId: wordId, hanzi, pinyin, english, userAnswer: normalizedAnswer, explanation, createdAt: new Date() })
+			.onConflictDoNothing()
+			.returning({ id: explains.id });
+
+		const explainId = row[0]?.id ?? (
+			await db
+				.select({ id: explains.id })
+				.from(explains)
+				.where(and(eq(explains.vocabularyId, wordId), eq(explains.userAnswer, normalizedAnswer)))
+				.limit(1)
+		)[0].id;
+
+		await db
+			.insert(explainsUsers)
+			.values({ explainId, userId })
+			.onConflictDoNothing();
 	}
 
 	return json({ explanation });

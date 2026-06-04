@@ -1,17 +1,17 @@
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
-import { explains } from '$lib/server/db/schema';
+import { explains, explainsUsers } from '$lib/server/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const userId = locals.user!.id;
 	const rows = await db
-		.select()
+		.select({ explains })
 		.from(explains)
-		.where(eq(explains.userId, userId))
+		.innerJoin(explainsUsers, and(eq(explainsUsers.explainId, explains.id), eq(explainsUsers.userId, userId)))
 		.orderBy(desc(explains.createdAt));
-	return { explains: rows };
+	return { explains: rows.map((r) => r.explains) };
 };
 
 export const actions: Actions = {
@@ -21,7 +21,7 @@ export const actions: Actions = {
 		const id = parseInt(data.get('id') as string);
 		if (!id || isNaN(id)) return fail(400, { error: 'Invalid ID' });
 		await db
-			.delete(explains)
-			.where(and(eq(explains.id, id), eq(explains.userId, userId)));
+			.delete(explainsUsers)
+			.where(and(eq(explainsUsers.explainId, id), eq(explainsUsers.userId, userId)));
 	}
 };
