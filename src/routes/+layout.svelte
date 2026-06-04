@@ -164,7 +164,7 @@
 			{/if}
 		</div>
 
-		<div class="flex-none gap-1 sm:gap-2">
+		<div class="flex-none flex items-center gap-1 sm:gap-2">
 			<a
 				href="/"
 				class="btn btn-ghost btn-sm hidden sm:inline-flex"
