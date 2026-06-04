@@ -44,7 +44,6 @@
 							type="text"
 							name="pin"
 							inputmode="numeric"
-							pattern="\d{6}"
 							maxlength="6"
 							oninput={(e) => {
 								const el = e.currentTarget as HTMLInputElement;
