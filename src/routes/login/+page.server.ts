@@ -42,7 +42,7 @@ export const actions: Actions = {
 	pin: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const email = ((data.get('email') as string) ?? '').trim().toLowerCase();
-		const pin = ((data.get('pin') as string) ?? '').trim();
+		const pin = ((data.get('pin') as string) ?? '').replace(/\s/g, '');
 
 		if (!pin || !/^\d{6}$/.test(pin)) {
 			return fail(400, { sent: true, email, pinError: 'Please enter the 6-digit PIN from your email.' });
