@@ -36,6 +36,21 @@ function classifyError(correct: string, typed: string): ErrorType {
 	return 'different';
 }
 
+function isPinyinHeavy(text: string): boolean {
+	const lines = text.split('\n');
+	const explanationLines: string[] = [];
+	for (const line of lines) {
+		if (/^\s*\*/.test(line)) break;
+		explanationLines.push(line);
+	}
+	const explanation = explanationLines.join(' ');
+	const toneMarkRe = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/;
+	const words = explanation.split(/\s+/).filter((w) => w.length > 1);
+	if (words.length < 5) return false;
+	const pinyinCount = words.filter((w) => toneMarkRe.test(w)).length;
+	return pinyinCount / words.length > 0.2;
+}
+
 function buildBlankPrompt(
 	hanzi: string,
 	pinyin: string,
@@ -44,37 +59,30 @@ function buildBlankPrompt(
 	hskLevel: number | null
 ): string {
 	const level = hskLevel ?? 3;
-	const charCount = hanzi.length;
-	const chars = [...hanzi].join(', ');
 
 	let focus: string;
 	let exampleStyle: string;
 
 	if (level <= 2) {
-		focus =
-			charCount === 1
-				? `Give a vivid visual or story mnemonic to make "${english}" stick. Mention the character's shape or radical if it helps.`
-				: `Break down what each character (${chars}) means and how they combine to form "${english}". Keep it simple.`;
+		focus = `Give a memorable tip to connect the sound "${pinyinPlain}" to the meaning "${english}". A sound-alike in English, a rhyme, or a vivid image triggered by hearing it works well. Do not explain Chinese characters or their shapes.`;
 		exampleStyle = 'very short and beginner-friendly';
 	} else if (level <= 4) {
-		focus =
-			charCount === 1
-				? `Explain the meaning with useful associations, etymology, or how it's used in compounds.`
-				: `Break down each character (${chars}) and how they combine. Add one practical usage tip - collocations, common contexts, or what it contrasts with.`;
+		focus = `Help the learner connect the sound "${pinyinPlain}" to the meaning "${english}". You can describe when this word is heard in daily speech, give an English sound-alike, or contrast it with a word that sounds similar.`;
 		exampleStyle = 'natural, everyday';
 	} else {
-		focus =
-			charCount === 1
-				? `Explain the nuance, register, and usage context. When is this used vs similar words?`
-				: `Explain what each character (${chars}) contributes, the register (formal/written/spoken), and when to use this over similar expressions.`;
-		exampleStyle = 'natural, showing proper context and register';
+		focus = `Explain the nuance and spoken register of "${pinyinPlain}" = "${english}". When would a native speaker say this vs similar words? Is it formal, casual, or written-only? Focus on spoken usage.`;
+		exampleStyle = 'natural, showing proper spoken context and register';
 	}
 
-	return `Chinese HSK ${level} word: "${english}" = ${pinyinPlain} (${pinyin}, ${hanzi}).
+	return `You are helping a learner who is studying spoken Mandarin Chinese. The goal is to recognize and pronounce words by ear - this is NOT about reading or writing Chinese characters.
 
-${focus} No pinyin tips. Use only pinyin (no hanzi) in your explanation sentences. Max 3 sentences.
+HSK ${level} word: "${english}" is spoken as "${pinyinPlain}" (with tones: ${pinyin}).
 
-Then two ${exampleStyle} example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
+${focus}
+
+Write your explanation in English. You may reference the pronunciation "${pinyinPlain}" inline, but do not analyze or explain the Chinese characters. Max 3 sentences.
+
+Then two ${exampleStyle} example sentences, each on its own line: *pinyin with tones* - English translation.`;
 }
 
 function buildWrongPrompt(
@@ -89,25 +97,41 @@ function buildWrongPrompt(
 	const errorType = classifyError(pinyinPlain, userAnswer);
 
 	if (errorType === 'different') {
-		return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}".
+		return `You are helping a learner who is studying spoken Mandarin Chinese - NOT reading or writing characters.
 
-The student typed a completely different word. In 3-4 sentences: (1) identify what "${userAnswer}" means and why it doesn't fit this prompt, (2) explain what makes "${pinyinPlain}" the right word, (3) if they are near-synonyms, clearly highlight the distinction. Use only pinyin (no hanzi). Be encouraging.
+HSK ${level} flashcard. Prompt: "${english}". Correct pronunciation: "${pinyinPlain}" (tones: ${pinyin}). The learner typed: "${userAnswer}".
+
+The learner typed a completely different word. Write in English: (1) explain what "${userAnswer}" means in Chinese and why it doesn't match "${english}", (2) explain what makes "${pinyinPlain}" the right word to say, (3) if they are near-synonyms, highlight the distinction in meaning or spoken usage. Do not analyze Chinese characters. Be encouraging.
 
 Then one example sentence for "${pinyinPlain}" and one for "${userAnswer}" to contrast usage, each on its own line: *pinyin with tones* - English translation.`;
 	}
 
 	const errorHint: Record<Exclude<ErrorType, 'different'>, string> = {
-		close_typo: 'The student was very close - only a small spelling difference.',
-		transposition: 'The student had the right syllables but in the wrong order.',
-		wrong_syllable_count: `The student typed ${userAnswer.trim().split(/\s+/).length} syllable(s); the correct answer has ${pinyinPlain.trim().split(/\s+/).length}.`,
-		partial: 'The student partially remembered the pinyin.'
+		close_typo: 'The learner was very close - only a small spelling difference.',
+		transposition: 'The learner had the right syllables but in the wrong order.',
+		wrong_syllable_count: `The learner typed ${userAnswer.trim().split(/\s+/).length} syllable(s); the correct answer has ${pinyinPlain.trim().split(/\s+/).length}.`,
+		partial: 'The learner partially remembered the pinyin.'
 	};
 
-	return `HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (${pinyin}, ${hanzi}). Student typed: "${userAnswer}". ${errorHint[errorType]}
+	return `You are helping a learner who is studying spoken Mandarin Chinese - NOT reading or writing characters.
 
-In 2-3 sentences: explain the mistake and how to remember the correct answer. Focus on meaning and associations, not pinyin pronunciation. Use only pinyin (no hanzi) in your explanation sentences. Be encouraging.
+HSK ${level} flashcard. Prompt: "${english}". Correct: "${pinyinPlain}" (tones: ${pinyin}). Learner typed: "${userAnswer}". ${errorHint[errorType]}
 
-Then two example sentences using ${hanzi}, each on its own line: *pinyin with tones* - English translation.`;
+Write in English: in 2-3 sentences, explain the mistake and give a tip to remember the correct sound. Focus on the meaning and spoken use of the word. Be encouraging.
+
+Then two example sentences for "${pinyinPlain}", each on its own line: *pinyin with tones* - English translation.`;
+}
+
+async function generate(openai: OpenAI, prompt: string): Promise<string> {
+	const call = (p: string) =>
+		openai.responses.create({ model: 'gpt-5.4-mini', store: false, service_tier: 'flex', input: p });
+
+	let text = (await call(prompt)).output_text;
+	if (isPinyinHeavy(text)) {
+		const retryPrompt = prompt + '\n\nRespond in English.';
+		text = (await call(retryPrompt)).output_text;
+	}
+	return text;
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -134,13 +158,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			explanation = cached.explanation;
 		} else {
 			const openai = new OpenAI({ apiKey: key });
-			const response = await openai.responses.create({
-				model: 'gpt-5.4-mini',
-				store: false,
-				service_tier: 'flex',
-				input: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
-			});
-			explanation = response.output_text;
+			explanation = await generate(openai, buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel));
 			await db
 				.insert(explainsCache)
 				.values({ vocabId: wordId, explanation })
@@ -157,23 +175,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				explanation = cached.explanation;
 			} else {
 				const openai = new OpenAI({ apiKey: key });
-				const response = await openai.responses.create({
-					model: 'gpt-5.4-mini',
-					store: false,
-					service_tier: 'flex',
-					input: buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer)
-				});
-				explanation = response.output_text;
+				explanation = await generate(openai, buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer));
 			}
 		} else {
 			const openai = new OpenAI({ apiKey: key });
-			const response = await openai.responses.create({
-				model: 'gpt-5.4-mini',
-				store: false,
-				service_tier: 'flex',
-				input: buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
-			});
-			explanation = response.output_text;
+			explanation = await generate(openai, buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel));
 		}
 	}
 
