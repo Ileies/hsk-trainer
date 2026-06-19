@@ -41,10 +41,25 @@
 	const remaining = $derived(practiceSession.remaining);
 	const total = $derived(practiceSession.total);
 
+	function parseExplanation(text: string, word: { pinyin: string; hanzi: string }): string {
+		const pinyinPattern = word.pinyin
+			.split(/\s+/)
+			.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+			.join('\\s*');
+		const hanziEscaped = word.hanzi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const bolded = text
+			.replace(new RegExp(pinyinPattern, 'gi'), '**$&**')
+			.replace(new RegExp(hanziEscaped, 'g'), '**$&**');
+		return marked.parse(bolded) as string;
+	}
+
 	const maskedExampleSentences = $derived.by(() => {
 		if (!currentWord?.exampleSentences || !currentWord.pinyin) return currentWord?.exampleSentences ?? null;
-		const escaped = currentWord.pinyin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-		return currentWord.exampleSentences.replace(new RegExp(escaped, 'gi'), '[...]');
+		const pattern = currentWord.pinyin
+			.split(/\s+/)
+			.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+			.join('\\s*');
+		return currentWord.exampleSentences.replace(new RegExp(pattern, 'gi'), '[...]');
 	});
 
 	// Initialise aiCheck from localStorage once on component mount
@@ -538,7 +553,7 @@
 							class="explanation-md mt-3 rounded-xl bg-base-200 px-4 py-3 text-sm leading-relaxed text-base-content/80"
 						>
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-							{@html marked.parse(practiceSession.explanation)}
+							{@html parseExplanation(practiceSession.explanation, currentWord)}
 						</div>
 					{/if}
 
@@ -697,7 +712,7 @@
 						class="explanation-md rounded-xl bg-base-100 px-4 py-3 text-sm leading-relaxed text-base-content/80"
 					>
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html marked.parse(practiceSession.explanation)}
+						{@html parseExplanation(practiceSession.explanation, practiceSession.result.word)}
 					</div>
 				{/if}
 
