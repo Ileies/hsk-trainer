@@ -32,6 +32,9 @@
 	// Focus
 	let focusedId = $state<number | null>(null);
 	let bfsResult = new Map<number, number>();
+	// Pre-computed per-focus lists so render passes don't scan all 5k nodes / 30k edges each frame
+	let focusedEdges: typeof keptEdges = [];
+	let nearNodes: SimNode[] = [];
 
 	// Camera - plain objects mutated each frame
 	const cam = { x: 0, y: 0, scale: 0.5 };
@@ -86,6 +89,28 @@
 
 	let rafId = 0;
 	let simulated = false;
+	let needsRedraw = true;
+
+	const LAYOUT_CACHE_KEY = 'hsk-map-layout-v2';
+
+	function loadCachedLayout(): { id: number; x: number; y: number }[] | null {
+		try {
+			const raw = localStorage.getItem(LAYOUT_CACHE_KEY);
+			if (!raw) return null;
+			const data = JSON.parse(raw);
+			if (!Array.isArray(data) || data.length !== words.length) return null;
+			return data;
+		} catch { return null; }
+	}
+
+	function saveCachedLayout(ns: SimNode[]) {
+		try {
+			localStorage.setItem(
+				LAYOUT_CACHE_KEY,
+				JSON.stringify(ns.map(n => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0 })))
+			);
+		} catch {}
+	}
 
 	const HSK_COLORS = ['#4ade80', '#60a5fa', '#facc15', '#fb923c', '#f87171', '#c084fc'];
 	const HSK_LABELS = ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6'];
@@ -119,10 +144,7 @@
 		bfsResult = new Map();
 
 		if (simWords.length === 0) {
-			nodes = [];
-			keptEdges = [];
-			adjacency = new Map();
-			nodeById = new Map();
+			nodes = []; keptEdges = []; adjacency = new Map(); nodeById = new Map();
 			loading = false;
 			return;
 		}
@@ -131,23 +153,64 @@
 		adjacency = adj;
 		keptEdges = edges;
 
-		// Compute degree from the pruned edge set
 		const degree = new Map<number, number>(simWords.map((w) => [w.id, 0]));
 		for (const edge of edges) {
 			degree.set(edge.sourceId, (degree.get(edge.sourceId) ?? 0) + 1);
 			degree.set(edge.targetId, (degree.get(edge.targetId) ?? 0) + 1);
 		}
 
-		// Sort highest-degree first so they land at the center of the spiral
-		const byDegree = [...simWords].sort(
-			(a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0)
-		);
-
+		const byDegree = [...simWords].sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
 		const connectedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) > 0);
 		const isolatedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) === 0);
-
-		// Phase 1: simulate connected nodes. Phase 2: spread isolated nodes with pure repulsion.
 		const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+		function finalize(connNodes: SimNode[]) {
+			const cx = connNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connNodes.length;
+			const cy = connNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connNodes.length;
+			for (const n of connNodes) { n.x = (n.x ?? 0) - cx; n.y = (n.y ?? 0) - cy; }
+
+			const clusterR = connNodes.reduce((r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)), 0);
+			const isoR = clusterR + 20;
+			const isoNodes: SimNode[] = isolatedWords.map((w, i) => ({
+				...w,
+				x: isoR * Math.cos(i * goldenAngle),
+				y: isoR * Math.sin(i * goldenAngle),
+				degree: 0
+			}));
+
+			const allNodes = [...connNodes, ...isoNodes];
+			saveCachedLayout(allNodes);
+
+			nodes = allNodes;
+			nodeById = new Map(allNodes.map(n => [n.id, n]));
+			basePositions = allNodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 }));
+			applyLayout();
+
+			if (canvas) {
+				cam.x = canvas.width / 2; cam.y = canvas.height / 2; cam.scale = minScale;
+				camTarget.x = cam.x; camTarget.y = cam.y; camTarget.scale = minScale;
+			}
+			loading = false;
+			needsRedraw = true;
+			const autoFocus = byDegree[0];
+			if (autoFocus) focusNode(autoFocus.id);
+		}
+
+		// Restore from localStorage cache - instant load on repeat visits
+		const cached = loadCachedLayout();
+		if (cached) {
+			const posMap = new Map(cached.map(p => [p.id, p]));
+			const connNodes: SimNode[] = connectedWords.map(w => {
+				const p = posMap.get(w.id) ?? { x: 0, y: 0 };
+				return { ...w, x: p.x, y: p.y, degree: degree.get(w.id) ?? 0 };
+			});
+			finalize(connNodes);
+			return;
+		}
+
+		// First visit: run force simulation, then cache. One rAF yield so the loading
+		// spinner renders before we block, then everything runs synchronously to avoid
+		// setTimeout throttling on mobile (which can delay chunks by seconds each).
 		const spiralScale = 20;
 		const connSimNodes: SimNode[] = connectedWords.map((w, i) => ({
 			...w,
@@ -156,119 +219,24 @@
 			degree: degree.get(w.id) ?? 0
 		}));
 
-		const idToConn = new Map(connSimNodes.map((n) => [n.id, n]));
-
+		const idToConn = new Map(connSimNodes.map(n => [n.id, n]));
 		const simLinks = edges
-			.map((e) => {
-				const s = idToConn.get(e.sourceId);
-				const t = idToConn.get(e.targetId);
+			.map(e => {
+				const s = idToConn.get(e.sourceId), t = idToConn.get(e.targetId);
 				return s && t ? { source: s, target: t, score: e.score } : null;
 			})
 			.filter((l): l is NonNullable<typeof l> => l !== null);
 
 		const sim = forceSimulation(connSimNodes)
 			.force('charge', forceManyBody().strength(-80))
-			.force(
-				'link',
-				forceLink(simLinks)
-					.distance((l: any) => 20 + 60 / (1 + l.score * 10))
-					.strength(0.6)
-			)
+			.force('link', forceLink(simLinks).distance((l: any) => 20 + 60 / (1 + l.score * 10)).strength(0.6))
 			.force('center', forceCenter(0, 0))
 			.stop();
 
-		// 1/d² repulsion from cluster center - no equilibrium radius, no ring
-		function forceClusterRepel(strength: number) {
-			let ns: SimNode[] = [];
-			function repel(alpha: number) {
-				for (const n of ns) {
-					const x = n.x ?? 0, y = n.y ?? 0;
-					const d2 = x * x + y * y;
-					if (d2 < 1) continue;
-					const k = (strength * alpha) / (Math.sqrt(d2) * d2);
-					n.vx = (n.vx ?? 0) + x * k;
-					n.vy = (n.vy ?? 0) + y * k;
-				}
-			}
-			(repel as any).initialize = (newNodes: SimNode[]) => { ns = newNodes; };
-			return repel;
-		}
-
-		const TOTAL = 400;
-		const ISO_TOTAL = 300;
-		const CHUNK = 15;
-		let done = 0;
-		let phase = 1;
-		let isoSimNodes: SimNode[] = [];
-		let isoSim: { tick: () => void } | null = null;
-
-		function tick() {
-			if (phase === 1) {
-				const end = Math.min(done + CHUNK, TOTAL);
-				for (let i = done; i < end; i++) sim.tick();
-				done = end;
-				if (done < TOTAL) { setTimeout(tick, 0); return; }
-
-				const cx = connSimNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connSimNodes.length;
-				const cy = connSimNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connSimNodes.length;
-				for (const n of connSimNodes) { n.x = (n.x ?? 0) - cx; n.y = (n.y ?? 0) - cy; }
-
-				const clusterR = connSimNodes.reduce(
-					(r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)), 0
-				);
-
-				// Start isolated nodes just outside the cluster at golden-angle positions,
-				// then let mutual repulsion + cluster repulsion spread them - no gravity,
-				// so they can never settle into a ring equilibrium
-				const isoStartR = clusterR + 20;
-				isoSimNodes = isolatedWords.map((w, i) => ({
-					...w,
-					x: isoStartR * Math.cos(i * goldenAngle),
-					y: isoStartR * Math.sin(i * goldenAngle),
-					degree: 0
-				}));
-
-				isoSim = forceSimulation<SimNode>(isoSimNodes)
-					.force('charge', forceManyBody<SimNode>().strength(-50))
-					.force('clusterRepel', forceClusterRepel(connSimNodes.length * 120))
-					.stop();
-
-				phase = 2;
-				done = 0;
-				setTimeout(tick, 0);
-				return;
-			}
-
-			const end = Math.min(done + CHUNK, ISO_TOTAL);
-			for (let i = done; i < end; i++) isoSim!.tick();
-			done = end;
-			if (done < ISO_TOTAL) { setTimeout(tick, 0); return; }
-
-			const allNodes = [...connSimNodes, ...isoSimNodes];
-			const allById = new Map(allNodes.map((n) => [n.id, n]));
-
-			nodes = allNodes;
-			nodeById = allById;
-			basePositions = allNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
-
-			applyLayout();
-
-			if (canvas) {
-				cam.x = canvas.width / 2;
-				cam.y = canvas.height / 2;
-				cam.scale = minScale;
-				camTarget.x = cam.x;
-				camTarget.y = cam.y;
-				camTarget.scale = minScale;
-			}
-
-			loading = false;
-
-			const autoFocus = byDegree[0] ?? connSimNodes[0];
-			if (autoFocus) focusNode(autoFocus.id);
-		}
-
-		setTimeout(tick, 0);
+		requestAnimationFrame(() => {
+			for (let i = 0; i < 120; i++) sim.tick();
+			finalize(connSimNodes);
+		});
 	}
 
 	function applyLayout() {
@@ -327,6 +295,8 @@
 			.x((n: SimNode) => n.x ?? 0)
 			.y((n: SimNode) => n.y ?? 0)
 			.addAll(nodes);
+
+		needsRedraw = true;
 	}
 
 	function focusNode(id: number, panCamera = true) {
@@ -334,6 +304,17 @@
 		if (!node) return;
 		focusedId = id;
 		bfsResult = bfsDistances(adjacency, id, 3);
+		// Pre-compute per-focus lists so render passes don't scan everything each frame
+		focusedEdges = keptEdges.filter(e => {
+			const sd = bfsResult.get(e.sourceId) ?? Infinity;
+			const td = bfsResult.get(e.targetId) ?? Infinity;
+			return Math.min(sd, td) <= 2;
+		});
+		nearNodes = nodes.filter(n => {
+			const d = bfsResult.get(n.id);
+			return d !== undefined && d <= 2;
+		});
+		needsRedraw = true;
 		if (panCamera && canvas) {
 			camTarget.scale = 1.8;
 			camTarget.x = canvas.width / 2 - (node.x ?? 0) * camTarget.scale;
@@ -344,6 +325,9 @@
 	function defocus() {
 		focusedId = null;
 		bfsResult = new Map();
+		focusedEdges = [];
+		nearNodes = [];
+		needsRedraw = true;
 	}
 
 	function canvasToWorld(clientX: number, clientY: number): [number, number] {
@@ -376,6 +360,7 @@
 		camTarget.x = cam.x;
 		camTarget.y = cam.y;
 		camTarget.scale = cam.scale;
+		needsRedraw = true;
 	}
 
 	function onPointerDown(e: PointerEvent) {
@@ -418,6 +403,7 @@
 				camTarget.x = cam.x;
 				camTarget.y = cam.y;
 				camTarget.scale = cam.scale;
+				needsRedraw = true;
 			}
 			lastPinchDist = dist;
 			hasDragged = true;
@@ -435,6 +421,7 @@
 			camTarget.y = cam.y;
 			dragLast = { x: e.clientX, y: e.clientY };
 			hoverNode = null;
+			needsRedraw = true;
 		} else if (!loading && nodes.length > 0) {
 			const [wx, wy] = canvasToWorld(e.clientX, e.clientY);
 			hoverNode = hitTest(wx, wy);
@@ -488,18 +475,42 @@
 		rafId = requestAnimationFrame(renderLoop);
 		if (!canvas || loading || nodes.length === 0) return;
 
-		const ctx = canvas.getContext('2d')!;
-		const W = canvas.width;
-		const H = canvas.height;
-
-		// Enforce bounds on camTarget every frame so nothing slips through
 		const ct = clampCamPos(camTarget.x, camTarget.y, camTarget.scale);
 		camTarget.x = ct.x;
 		camTarget.y = ct.y;
 
-		cam.x += (camTarget.x - cam.x) * 0.12;
-		cam.y += (camTarget.y - cam.y) * 0.12;
-		cam.scale += (camTarget.scale - cam.scale) * 0.12;
+		const dx = camTarget.x - cam.x;
+		const dy = camTarget.y - cam.y;
+		const ds = camTarget.scale - cam.scale;
+		const camMoving = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05 || Math.abs(ds) > 0.0005;
+
+		if (!camMoving && !needsRedraw) return;
+		needsRedraw = false;
+
+		if (camMoving) {
+			cam.x += dx * 0.2;
+			cam.y += dy * 0.2;
+			cam.scale += ds * 0.2;
+		} else {
+			cam.x = camTarget.x;
+			cam.y = camTarget.y;
+			cam.scale = camTarget.scale;
+		}
+
+		const ctx = canvas.getContext('2d')!;
+		const W = canvas.width;
+		const H = canvas.height;
+
+		// World-space viewport bounds for culling (pad covers max node radius ~11/scale)
+		const vpPad = 20 / cam.scale;
+		const vpX0 = -cam.x / cam.scale - vpPad;
+		const vpY0 = -cam.y / cam.scale - vpPad;
+		const vpX1 = (W - cam.x) / cam.scale + vpPad;
+		const vpY1 = (H - cam.y) / cam.scale + vpPad;
+
+		function inView(x: number, y: number): boolean {
+			return x >= vpX0 && x <= vpX1 && y >= vpY0 && y <= vpY1;
+		}
 
 		ctx.clearRect(0, 0, W, H);
 		ctx.save();
@@ -508,136 +519,152 @@
 
 		const focused = focusedId !== null;
 
-		function drawNode(node: SimNode, d: number | undefined) {
-			const nx = node.x ?? 0;
-			const ny = node.y ?? 0;
+		// Pass 0: edge skeleton - skip at overview zoom where it's invisible
+		if (cam.scale > 0.12) {
+			ctx.globalAlpha = focused ? 0.04 : 0.08;
+			ctx.strokeStyle = '#aaaaaa';
+			ctx.lineWidth = 1 / cam.scale;
+			ctx.beginPath();
+			for (const edge of keptEdges) {
+				const s = nodeById.get(edge.sourceId);
+				const t = nodeById.get(edge.targetId);
+				if (!s || !t) continue;
+				if (!activeHsk.has(s.hskLevel) || !activeHsk.has(t.hskLevel)) continue;
+				const sx = s.x ?? 0, sy = s.y ?? 0, tx = t.x ?? 0, ty = t.y ?? 0;
+				if (!inView(sx, sy) && !inView(tx, ty)) continue;
+				ctx.moveTo(sx, sy);
+				ctx.lineTo(tx, ty);
+			}
+			ctx.stroke();
+		}
+
+		// Node batch helper: groups circles by (hskLevel, alpha) so each color/alpha
+		// combo is drawn with a single fill() call instead of one per node.
+		// Numeric key: hskLevel*10 + round(alpha*10) - avoids string allocation per node.
+		type Circle = [number, number, number]; // x, y, r
+		const batchMap = new Map<number, { color: string; alpha: number; plain: Circle[]; outlined: Circle[] }>();
+
+		function batchNode(node: SimNode, d: number | undefined) {
 			const alpha = nodeAlpha(d);
 			if (alpha < 0.01) return;
+			const nx = node.x ?? 0, ny = node.y ?? 0;
+			if (!inView(nx, ny)) return;
 			const r = focused
 				? nodeRadius(d) / cam.scale
 				: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
 			const color = hskColor(node.hskLevel);
-			const isFocused = node.id === focusedId;
-
-			ctx.save();
-			ctx.globalAlpha = alpha;
-			if (isFocused) {
-				ctx.shadowColor = color;
-				ctx.shadowBlur = 20;
-			}
-			ctx.fillStyle = color;
-			ctx.beginPath();
-			ctx.arc(nx, ny, r, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.shadowBlur = 0;
-			if (node.hanzi.length === 1) {
-				ctx.strokeStyle = '#000000';
-				ctx.lineWidth = 1.5 / cam.scale;
-				ctx.stroke();
-			}
-			ctx.restore();
+			const key = node.hskLevel * 10 + Math.round(alpha * 10);
+			let b = batchMap.get(key);
+			if (!b) { b = { color, alpha, plain: [], outlined: [] }; batchMap.set(key, b); }
+			(node.hanzi.length === 1 ? b.outlined : b.plain).push([nx, ny, r]);
 		}
 
-		function drawLabel(node: SimNode, d: number | undefined) {
-			const alpha = nodeAlpha(d);
-			if (alpha < 0.01) return;
-			const showLabel = focused
-				? d !== undefined && d <= 1
-					? cam.scale > 0.5
-					: cam.scale > 1.2
-				: cam.scale > 1.3;
-			if (!showLabel) return;
-			const r = focused
-				? nodeRadius(d) / cam.scale
-				: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
-			const isFocused = node.id === focusedId;
-			const fs = Math.max(7, Math.round(12 / cam.scale));
-			ctx.save();
-			ctx.globalAlpha = alpha * 0.95;
-			ctx.fillStyle = '#111111';
-			ctx.font = `${isFocused ? '900 ' : ''}${fs}px "Noto Serif CJK SC", serif`;
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'top';
-			ctx.fillText(node.hanzi, node.x ?? 0, (node.y ?? 0) + r + 2 / cam.scale);
-			ctx.restore();
-		}
-
-		// Pass 0: edge skeleton - always visible so graph structure is legible at any zoom
-		{
-			ctx.save();
-			ctx.strokeStyle = '#aaaaaa';
-			ctx.lineWidth = 1 / cam.scale;
-			ctx.globalAlpha = focused ? 0.04 : 0.08;
-			ctx.beginPath();
-			for (const edge of keptEdges) {
-				const sNode = nodeById.get(edge.sourceId);
-				const tNode = nodeById.get(edge.targetId);
-				if (!sNode || !tNode) continue;
-				if (!activeHsk.has(sNode.hskLevel) || !activeHsk.has(tNode.hskLevel)) continue;
-				ctx.moveTo(sNode.x ?? 0, sNode.y ?? 0);
-				ctx.lineTo(tNode.x ?? 0, tNode.y ?? 0);
+		function flushBatches() {
+			for (const { color, alpha, plain, outlined } of batchMap.values()) {
+				ctx.globalAlpha = alpha;
+				ctx.fillStyle = color;
+				ctx.beginPath();
+				for (const [x, y, r] of plain) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+				for (const [x, y, r] of outlined) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+				ctx.fill();
+				if (outlined.length > 0) {
+					ctx.strokeStyle = '#000000';
+					ctx.lineWidth = 1.5 / cam.scale;
+					ctx.beginPath();
+					for (const [x, y, r] of outlined) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+					ctx.stroke();
+				}
 			}
-			ctx.stroke();
-			ctx.restore();
+			batchMap.clear();
 		}
 
-		// Pass 1: background nodes (far/unfocused) - drawn below edges
+		// Pass 1: background nodes (d > 2 when focused, all when not)
 		for (const node of nodes) {
 			if (!activeHsk.has(node.hskLevel)) continue;
 			const d = focused ? bfsResult.get(node.id) : undefined;
-			if (focused && d !== undefined && d <= 2) continue; // drawn in pass 3
-			drawNode(node, d);
+			if (focused && d !== undefined && d <= 2) continue;
+			batchNode(node, d);
 		}
+		flushBatches();
 
-		// Pass 2: edges - always on top of background nodes
+		// Pass 2: focused edges - iterate pre-computed list (~hundreds, not 30k)
 		if (focused) {
-			for (const edge of keptEdges) {
-				const sNode = nodeById.get(edge.sourceId);
-				const tNode = nodeById.get(edge.targetId);
-				if (!sNode || !tNode) continue;
-				if (!activeHsk.has(sNode.hskLevel) || !activeHsk.has(tNode.hskLevel)) continue;
-
+			type EBatch = { alpha: number; lw: number; lines: [number, number, number, number][] };
+			const eBatches = new Map<number, EBatch>();
+			for (const edge of focusedEdges) {
+				const s = nodeById.get(edge.sourceId);
+				const t = nodeById.get(edge.targetId);
+				if (!s || !t) continue;
+				if (!activeHsk.has(s.hskLevel) || !activeHsk.has(t.hskLevel)) continue;
 				const sd = bfsResult.get(edge.sourceId) ?? Infinity;
 				const td = bfsResult.get(edge.targetId) ?? Infinity;
 				const nearDepth = Math.min(sd, td);
 				const farDepth = Math.max(sd, td);
 				if (nearDepth > 2) continue;
-
-				const alpha = edgeAlpha(farDepth);
-				const sx = sNode.x ?? 0;
-				const sy = sNode.y ?? 0;
-				const tx = tNode.x ?? 0;
-				const ty = tNode.y ?? 0;
-
-				ctx.save();
-				ctx.globalAlpha = nearDepth === 0 ? 0.85 : alpha * 0.5;
-				ctx.strokeStyle = '#777777';
-				ctx.lineWidth = (nearDepth === 0 ? 1.8 : 1) / cam.scale;
+				const sx = s.x ?? 0, sy = s.y ?? 0, tx = t.x ?? 0, ty = t.y ?? 0;
+				if (!inView(sx, sy) && !inView(tx, ty)) continue;
+				const alpha = nearDepth === 0 ? 0.85 : edgeAlpha(farDepth) * 0.5;
+				const lw = (nearDepth === 0 ? 1.8 : 1) / cam.scale;
+				const key = Math.round(alpha * 100);
+				let b = eBatches.get(key);
+				if (!b) { b = { alpha, lw, lines: [] }; eBatches.set(key, b); }
+				b.lines.push([sx, sy, tx, ty]);
+			}
+			ctx.strokeStyle = '#777777';
+			for (const { alpha, lw, lines } of eBatches.values()) {
+				ctx.globalAlpha = alpha;
+				ctx.lineWidth = lw;
 				ctx.beginPath();
-				ctx.moveTo(sx, sy);
-				ctx.lineTo(tx, ty);
+				for (const [sx, sy, tx, ty] of lines) { ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); }
 				ctx.stroke();
-
-				ctx.restore();
 			}
 		}
 
-		// Pass 3: near/focused nodes - always on top of edges
+		// Pass 3: near/focused nodes - iterate pre-computed list (~hundreds, not 5k)
 		if (focused) {
-			for (const node of nodes) {
-				if (!activeHsk.has(node.hskLevel)) continue;
-				const d = bfsResult.get(node.id);
-				if (d === undefined || d > 2) continue;
-				drawNode(node, d);
+			const fn = nodeById.get(focusedId!);
+			if (fn && inView(fn.x ?? 0, fn.y ?? 0)) {
+				const nx = fn.x ?? 0, ny = fn.y ?? 0;
+				const r = nodeRadius(0) / cam.scale;
+				ctx.globalAlpha = 0.2;
+				ctx.fillStyle = hskColor(fn.hskLevel);
+				ctx.beginPath();
+				ctx.arc(nx, ny, r * 2.5, 0, Math.PI * 2);
+				ctx.fill();
 			}
+			for (const node of nearNodes) {
+				if (!activeHsk.has(node.hskLevel)) continue;
+				batchNode(node, bfsResult.get(node.id));
+			}
+			flushBatches();
 		}
 
-		// Pass 4: labels - always on top of every node
-		for (const node of nodes) {
-			if (!activeHsk.has(node.hskLevel)) continue;
-			const d = focused ? bfsResult.get(node.id) : undefined;
-			if (focused && (d === undefined || d > 2)) continue;
-			drawLabel(node, d);
+		// Pass 4: labels - use nearNodes when focused to avoid scanning all 5k
+		{
+			const fs = Math.max(7, Math.round(12 / cam.scale));
+			ctx.fillStyle = '#111111';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'top';
+			const labelNodes = focused ? nearNodes : nodes;
+			for (const node of labelNodes) {
+				if (!activeHsk.has(node.hskLevel)) continue;
+				const d = focused ? bfsResult.get(node.id) : undefined;
+				if (focused && (d === undefined || d > 2)) continue;
+				const showLabel = focused
+					? d !== undefined && d <= 1 ? cam.scale > 0.5 : cam.scale > 1.2
+					: cam.scale > 1.3;
+				if (!showLabel) continue;
+				const alpha = nodeAlpha(d);
+				if (alpha < 0.01) continue;
+				const nx = node.x ?? 0, ny = node.y ?? 0;
+				if (!inView(nx, ny)) continue;
+				const r = focused
+					? nodeRadius(d) / cam.scale
+					: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
+				ctx.globalAlpha = alpha * 0.95;
+				ctx.font = `${node.id === focusedId ? '900 ' : ''}${fs}px "Noto Serif CJK SC", serif`;
+				ctx.fillText(node.hanzi, nx, ny + r + 2 / cam.scale);
+			}
 		}
 
 		ctx.restore();
@@ -703,6 +730,7 @@
 			const word = words.find((w) => w.id === id);
 			if (word) {
 				activeHsk = new Set([...activeHsk, word.hskLevel]);
+				needsRedraw = true;
 			}
 		}
 	}
@@ -802,6 +830,7 @@
 						next.has(level) ? next.delete(level) : next.add(level);
 						if (next.size === 0) return;
 						activeHsk = next;
+						needsRedraw = true;
 						if (focusedId !== null) {
 							const fn = nodeById.get(focusedId);
 							if (fn && !next.has(fn.hskLevel)) {
