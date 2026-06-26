@@ -92,6 +92,7 @@ All tables are defined in `src/lib/server/db/schema.ts`.
 The app is fully protected: `src/hooks.server.ts` checks the `session` cookie on every request and redirects to `/login` if the session is missing or expired.
 
 **Login flow:**
+
 1. User enters their email on `/login`
 2. Server creates an `auth_tokens` row (token + 6-digit PIN, 15-minute expiry) and sends an email via Nodemailer
 3. User either clicks the magic link (`/auth/verify?token=...`) or enters the PIN on the next screen
@@ -105,45 +106,49 @@ New users are automatically created on first login - there is no separate regist
 
 ## Route map
 
-| Route | Purpose |
-|---|---|
-| `/login` | Passwordless login: enter email, then magic link or PIN |
-| `/auth/verify` | Magic link callback - validates token, creates session |
-| `/auth/logout` | Destroys session cookie and redirects to `/login` |
-| `/` | Dashboard: per-level progress cards |
-| `/practice` | Flashcard loop (main feature - see below) |
-| `/finished` | Grid of learned words; allows un-learning |
-| `/search` | Full-text search (hanzi / pinyin / english); word detail view |
-| `/starred` | Starred words |
-| `/map` | Force-directed word graph (canvas) |
-| `/explains` | History of saved AI explanations |
-| `/settings` | Progress reset (danger zone) |
-| `GET /api/search` | Typeahead search used by navbar and word map (`?q=&limit=`) |
-| `POST /api/check-answer` | AI typo check - returns `{valid: 0|1, reason}` |
-| `POST /api/explain` | AI explanation - saves to DB, returns `{explanation}` |
-| `POST /api/repair` | AI flashcard repair (admin only) - updates `vocabulary.english` in DB, returns `{english}` |
-| `POST /api/star` | Toggle star - body `{wordId, starred}` |
-| `GET /api/practice-next` | Next word for client-side session navigation |
+| Route                    | Purpose                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ----------- |
+| `/login`                 | Passwordless login: enter email, then magic link or PIN                                    |
+| `/auth/verify`           | Magic link callback - validates token, creates session                                     |
+| `/auth/logout`           | Destroys session cookie and redirects to `/login`                                          |
+| `/`                      | Dashboard: per-level progress cards                                                        |
+| `/practice`              | Flashcard loop (main feature - see below)                                                  |
+| `/finished`              | Grid of learned words; allows un-learning                                                  |
+| `/search`                | Full-text search (hanzi / pinyin / english); word detail view                              |
+| `/starred`               | Starred words                                                                              |
+| `/map`                   | Force-directed word graph (canvas)                                                         |
+| `/explains`              | History of saved AI explanations                                                           |
+| `/settings`              | Progress reset (danger zone)                                                               |
+| `GET /api/search`        | Typeahead search used by navbar and word map (`?q=&limit=`)                                |
+| `POST /api/check-answer` | AI typo check - returns `{valid: 0                                                         | 1, reason}` |
+| `POST /api/explain`      | AI explanation - saves to DB, returns `{explanation}`                                      |
+| `POST /api/repair`       | AI flashcard repair (admin only) - updates `vocabulary.english` in DB, returns `{english}` |
+| `POST /api/star`         | Toggle star - body `{wordId, starred}`                                                     |
+| `GET /api/practice-next` | Next word for client-side session navigation                                               |
 
 ## Practice page - key mechanics
 
 **URL params act as session state:**
+
 - `?hsk=N` - filter to HSK level N
 - `?exclude=1,2,3` - comma-separated IDs already seen this session (excluded from random pick)
 - `?last=N` - ID of the last shown word (also soft-excluded to avoid repeats)
 
 **Answer normalization** (`/practice/+page.server.ts`):
+
 - `v` is treated as `u` (common pinyin shorthand)
 - whitespace collapsed; answer also checked without any spaces
 - comparison is against `pinyinPlain` (no tones, lowercase)
 
 **AI check flow** (client-side in `+page.svelte`):
+
 1. Form action `?/answer` runs server-side string comparison
 2. If wrong AND `aiCheck` is enabled (localStorage toggle), POST to `/api/check-answer`
 3. If `valid === 0` (typo), mark as correct + mark learned in DB; show "You could have also typed: ..."
 4. If `valid === 1`, show as wrong with optional `reason` text
 
 **`learned` flag is set in two places** (in `user_word_state` for the current user):
+
 - Server action `?/answer` on a correct string match
 - `/api/check-answer` when the AI declares a typo
 
@@ -158,6 +163,7 @@ On auth pages (`/login`, `/auth/*`) the layout skips the vocabulary query and re
 ## Word map
 
 `src/lib/MapCanvas.svelte` - Canvas-based, no DOM nodes per word:
+
 - Force simulation runs once client-side (300 ticks, then frozen)
 - Edges connect words that share CJK characters; max 15 edges per node
 - BFS from focused node used for depth-based opacity/size rendering
@@ -170,11 +176,11 @@ On auth pages (`/login`, `/auth/*`) the layout skips the vocabulary query and re
 
 All three API routes use `openai.responses.create` (not `chat.completions`), with `store: false`.
 
-| Route | Model | Notes |
-|---|---|---|
+| Route               | Model          | Notes                                                                                |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------ |
 | `/api/check-answer` | `gpt-5.4-nano` | Ultra-fast; `max_output_tokens: 32`; replies `"0"` for typos, short reason otherwise |
-| `/api/explain` | `gpt-5.4-mini` | 2-3 sentence explanation in Markdown; stored to `explains` table |
-| `/api/repair` | `gpt-5.4-mini` | Returns `{english: "..."}` JSON; updates `vocabulary.english` in DB |
+| `/api/explain`      | `gpt-5.4-mini` | 2-3 sentence explanation in Markdown; stored to `explains` table                     |
+| `/api/repair`       | `gpt-5.4-mini` | Returns `{english: "..."}` JSON; updates `vocabulary.english` in DB                  |
 
 All three return 500 if `OPENAI_KEY` is unset. The UI handles this gracefully (buttons just fail silently or show an error state).
 
@@ -185,12 +191,14 @@ All three return 500 if `OPENAI_KEY` is unset. The UI handles this gracefully (b
 **`scripts/deploy.ts`** - compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), restarts via PM2. Run via `bun run deploy`.
 
 **Migration scripts** (one-time, keep for reference):
+
 - `scripts/migrate-multiuser.ts` - added users/sessions/userWordState tables
 - `scripts/migrate-explains-junction.ts` - replaced `explains.user_id` column with `explains_users` junction table
 
 ## Common tasks
 
 **Add a new column to `vocabulary`:**
+
 1. Edit `src/lib/server/db/schema.ts`
 2. Run `bun run db:push`
 3. Update `serializePracticeWord` in `src/lib/server/practice.ts` if it needs to reach the client
@@ -205,24 +213,29 @@ Create `src/routes/api/<name>/+server.ts`, export named handlers (`GET`, `POST`,
 Create `src/routes/<name>/+page.svelte` and optionally `+page.server.ts` for the load function or form actions
 
 **Run type-check:**
+
 ```bash
 bun run check
 ```
 
 **Run the dev server:**
+
 ```bash
 bun run dev
 ```
 
 **Deploy to production:**
+
 ```bash
 bun run build && bun run deploy
 ```
+
 Compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), and restarts via PM2. Configured in `scripts/deploy.ts`.
 
 **Required env vars for production:** `DATABASE_URL`, `SMTP_HOST`, and at least `SMTP_FROM`. Optional: `OPENAI_KEY`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `ADMIN_MAIL`.
 
 **Inspect the database:**
+
 ```bash
 bun run db:studio
 ```

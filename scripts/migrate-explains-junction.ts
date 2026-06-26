@@ -80,6 +80,10 @@ try {
 	db.exec(`CREATE INDEX IF NOT EXISTS explains_vocab_idx ON explains (vocabulary_id)`);
 
 	console.log('Migration complete.');
-})();
-
-db.close();
+	db.run('COMMIT');
+} catch (error) {
+	db.run('ROLLBACK');
+	throw error;
+} finally {
+	db.close();
+}

@@ -76,9 +76,9 @@ const migrate = db.transaction(() => {
 	console.log(`Created seed user "${seedEmail}" with id ${userId}`);
 
 	// --- Migrate vocabulary state ---
-	const vocabCols = (
-		db.query('PRAGMA table_info(vocabulary)').all() as { name: string }[]
-	).map((c) => c.name);
+	const vocabCols = (db.query('PRAGMA table_info(vocabulary)').all() as { name: string }[]).map(
+		(c) => c.name
+	);
 
 	if (vocabCols.includes('learned')) {
 		const migrated = db.run(
@@ -94,9 +94,9 @@ const migrate = db.transaction(() => {
 	}
 
 	// --- Rebuild explains with user_id ---
-	const explainsCols = (
-		db.query('PRAGMA table_info(explains)').all() as { name: string }[]
-	).map((c) => c.name);
+	const explainsCols = (db.query('PRAGMA table_info(explains)').all() as { name: string }[]).map(
+		(c) => c.name
+	);
 
 	if (!explainsCols.includes('user_id')) {
 		db.run(`CREATE TABLE explains_new (

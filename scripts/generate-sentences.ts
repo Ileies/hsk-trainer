@@ -53,7 +53,11 @@ Nǐ ài shénme yùndòng? - What sport do you love?`;
 }
 
 function parse(text: string): Sentence[] | null {
-	const lines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+	const lines = text
+		.trim()
+		.split('\n')
+		.map((l) => l.trim())
+		.filter(Boolean);
 	if (lines.length !== 3) return null;
 
 	const sentences = lines.map((line) => {
@@ -157,10 +161,7 @@ async function main() {
 
 			if (sentences) {
 				const exampleSentences = sentences.map((s) => `${s.pinyin} - ${s.english}`).join('\n');
-				await db
-					.update(vocabulary)
-					.set({ exampleSentences })
-					.where(eq(vocabulary.id, word.id));
+				await db.update(vocabulary).set({ exampleSentences }).where(eq(vocabulary.id, word.id));
 				done++;
 			} else {
 				failed++;
