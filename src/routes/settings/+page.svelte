@@ -51,11 +51,7 @@
 						return async ({ update }) => update({ reset: true });
 					}}
 				>
-					<button
-						type="submit"
-						class="btn btn-error btn-sm gap-2"
-						disabled={!confirmed}
-					>
+					<button type="submit" class="btn btn-error btn-sm gap-2" disabled={!confirmed}>
 						<RotateCcw size={14} />
 						Reset All Progress
 					</button>
