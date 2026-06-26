@@ -98,7 +98,7 @@ export async function getPracticeData(
 	const select = wordWithStateSelect(userId);
 	const join = userStateJoin(userId);
 
-	const softExcludeIds = [...excludeIds, ...(lastId ? [lastId] : [])];
+	const softExcludeIds = lastId != null ? [...excludeIds, lastId] : excludeIds;
 	let word: RawWordRow | undefined;
 
 	if (softExcludeIds.length > 0) {

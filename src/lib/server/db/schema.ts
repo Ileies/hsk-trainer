@@ -1,4 +1,11 @@
-import { integer, sqliteTable, text, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+	integer,
+	sqliteTable,
+	text,
+	index,
+	primaryKey,
+	uniqueIndex
+} from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -45,7 +52,10 @@ export const explains = sqliteTable(
 	},
 	(table) => ({
 		vocabIdx: index('explains_vocab_idx').on(table.vocabularyId),
-		vocabAnswerUniq: uniqueIndex('explains_vocab_answer_uniq').on(table.vocabularyId, table.userAnswer)
+		vocabAnswerUniq: uniqueIndex('explains_vocab_answer_uniq').on(
+			table.vocabularyId,
+			table.userAnswer
+		)
 	})
 );
 
@@ -93,11 +103,55 @@ export const userWordState = sqliteTable(
 		learnedAt: integer('learned_at', { mode: 'timestamp' }),
 		starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
 		mistakeCount: integer('mistake_count').notNull().default(0),
-		seenAt: integer('seen_at', { mode: 'timestamp' })
+		seenAt: integer('seen_at', { mode: 'timestamp' }),
+		hanziLearned: integer('hanzi_learned', { mode: 'boolean' }).notNull().default(false),
+		hanziLearnedAt: integer('hanzi_learned_at', { mode: 'timestamp' })
 	},
 	(t) => ({
 		pk: primaryKey({ columns: [t.userId, t.vocabId] }),
 		learnedIdx: index('uws_learned_idx').on(t.userId, t.learned),
 		starredIdx: index('uws_starred_idx').on(t.userId, t.starred)
+	})
+);
+
+export const stories = sqliteTable('stories', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	title: text('title').notNull(),
+	titleEnglish: text('title_english').notNull(),
+	hskLevel: integer('hsk_level').notNull(),
+	description: text('description'),
+	createdAt: integer('created_at', { mode: 'timestamp' })
+		.notNull()
+		.$defaultFn(() => new Date())
+});
+
+export const storySentences = sqliteTable(
+	'story_sentences',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		storyId: integer('story_id').notNull(),
+		position: integer('position').notNull(),
+		chinese: text('chinese').notNull(),
+		english: text('english').notNull()
+	},
+	(t) => ({
+		storyIdx: index('ss_story_idx').on(t.storyId)
+	})
+);
+
+export const wordMap = sqliteTable('word_map', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	en: text('en').notNull().unique(),
+	zh: text('zh').notNull()
+});
+
+export const sentenceWords = sqliteTable(
+	'sentence_words',
+	{
+		sentenceId: integer('sentence_id').notNull(),
+		wordMapId: integer('word_map_id').notNull()
+	},
+	(t) => ({
+		pk: primaryKey({ columns: [t.sentenceId, t.wordMapId] })
 	})
 );

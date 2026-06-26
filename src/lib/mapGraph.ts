@@ -84,8 +84,12 @@ export function buildGraph(words: Word[]): {
 	const adjacency = new Map<number, { neighborId: number; sharedChars: string[] }[]>();
 	for (const word of words) adjacency.set(word.id, []);
 	for (const edge of keptEdges) {
-		adjacency.get(edge.sourceId)!.push({ neighborId: edge.targetId, sharedChars: edge.sharedChars });
-		adjacency.get(edge.targetId)!.push({ neighborId: edge.sourceId, sharedChars: edge.sharedChars });
+		adjacency
+			.get(edge.sourceId)!
+			.push({ neighborId: edge.targetId, sharedChars: edge.sharedChars });
+		adjacency
+			.get(edge.targetId)!
+			.push({ neighborId: edge.sourceId, sharedChars: edge.sharedChars });
 	}
 
 	return { edges: keptEdges, adjacency };
