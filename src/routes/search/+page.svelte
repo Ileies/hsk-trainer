@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import {
 		ArrowLeft,
 		Star,
@@ -41,7 +43,7 @@
 
 	function handleSearchKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && search.trim()) {
-			goto(`/search?q=${encodeURIComponent(search.trim())}`);
+			goto(resolve(`/search?q=${encodeURIComponent(search.trim())}` as '/search'));
 		}
 	}
 
@@ -55,15 +57,15 @@
 	}
 
 	function openDetail(id: number) {
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 		params.set('id', String(id));
 		if (data.q) params.set('q', data.q);
-		goto(`/search?${params}`);
+		goto(resolve(`/search?${params}` as '/search'));
 	}
 
 	function backToResults() {
-		if (data.q) goto(`/search?q=${encodeURIComponent(data.q)}`);
-		else goto('/search');
+		if (data.q) goto(resolve(`/search?q=${encodeURIComponent(data.q)}` as '/search'));
+		else goto(resolve('/search'));
 	}
 </script>
 
@@ -95,7 +97,9 @@
 
 		<!-- Hero card -->
 		<div
-			class="card bg-base-100 shadow-xl border border-base-200 overflow-hidden {LEVEL_RING_COLORS[data.word.hskLevel - 1]} ring-1"
+			class="card bg-base-100 shadow-xl border border-base-200 overflow-hidden {LEVEL_RING_COLORS[
+				data.word.hskLevel - 1
+			]} ring-1"
 		>
 			<!-- Top accent stripe -->
 			<div
@@ -181,16 +185,13 @@
 				<!-- Actions -->
 				<div class="flex gap-3 mt-8 pt-6 border-t border-base-200">
 					<a
-						href="/practice?hsk={data.word.hskLevel}"
+						href={resolve(`/practice?hsk=${data.word.hskLevel}` as '/practice')}
 						class="btn btn-primary flex-1 gap-2"
 					>
 						<BookOpen size={16} />
 						Practice HSK {data.word.hskLevel}
 					</a>
-					<a
-						href="/starred"
-						class="btn btn-ghost gap-2"
-					>
+					<a href={resolve('/starred')} class="btn btn-ghost gap-2">
 						<Star size={16} class="text-warning" />
 						Starred
 					</a>
@@ -221,7 +222,9 @@
 			<button
 				class="btn btn-primary btn-lg"
 				disabled={!search.trim()}
-				onclick={() => search.trim() && goto(`/search?q=${encodeURIComponent(search.trim())}`)}
+				onclick={() =>
+					search.trim() &&
+					goto(resolve(`/search?q=${encodeURIComponent(search.trim())}` as '/search'))}
 			>
 				Search
 			</button>
@@ -252,7 +255,7 @@
 
 		<!-- Results grid -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each data.results as word}
+			{#each data.results as word (word.id)}
 				<button
 					class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md hover:border-primary/30 transition-all text-left cursor-pointer group"
 					onclick={() => openDetail(word.id)}
@@ -297,9 +300,7 @@
 			<div class="hero-content text-center">
 				<div class="max-w-sm">
 					<Search size={48} class="mx-auto mb-4 text-base-content/20" />
-					<p class="text-base-content/50">
-						Search for any word in the HSK vocabulary list.
-					</p>
+					<p class="text-base-content/50">Search for any word in the HSK vocabulary list.</p>
 					<p class="text-base-content/35 text-sm mt-2">
 						Type Chinese characters, pinyin (with or without tones), or English.
 					</p>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { ArrowLeft, Star, StarOff } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -20,7 +21,7 @@
 </svelte:head>
 
 <div class="flex items-center gap-3 mb-6">
-	<a href="/" class="btn btn-ghost btn-sm gap-1">
+	<a href={resolve('/')} class="btn btn-ghost btn-sm gap-1">
 		<ArrowLeft size={16} />
 		Dashboard
 	</a>
@@ -39,14 +40,16 @@
 				<p class="text-base-content/40 text-sm mt-1">
 					Click the star on any word card while studying to save it here.
 				</p>
-				<a href="/practice" class="btn btn-primary btn-sm mt-6">Start practicing</a>
+				<a href={resolve('/practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
 			</div>
 		</div>
 	</div>
 {:else}
-	<p class="text-base-content/50 text-sm mb-4">{data.words.length} word{data.words.length === 1 ? '' : 's'}</p>
+	<p class="text-base-content/50 text-sm mb-4">
+		{data.words.length} word{data.words.length === 1 ? '' : 's'}
+	</p>
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-		{#each data.words as word}
+		{#each data.words as word (word.id)}
 			<div class="card bg-base-100 shadow-sm border border-base-200">
 				<div class="card-body py-4 px-5 gap-2">
 					<div class="flex items-start justify-between gap-2">
@@ -57,11 +60,7 @@
 						</div>
 						<form method="POST" action="?/unstar" use:enhance>
 							<input type="hidden" name="wordId" value={word.id} />
-							<button
-								type="submit"
-								class="btn btn-ghost btn-xs btn-circle"
-								title="Remove star"
-							>
+							<button type="submit" class="btn btn-ghost btn-xs btn-circle" title="Remove star">
 								<StarOff size={14} class="text-warning" />
 							</button>
 						</form>

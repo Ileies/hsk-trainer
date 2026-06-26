@@ -4,7 +4,7 @@ import { vocabulary, userWordState } from '$lib/server/db/schema';
 import { like, or, sql, eq, and } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 
-const wordSelect = (userId: number) => ({
+const wordSelect = () => ({
 	id: vocabulary.id,
 	hanzi: vocabulary.hanzi,
 	pinyin: vocabulary.pinyin,
@@ -27,7 +27,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
 	if (!isNaN(id)) {
 		const [word] = await db
-			.select(wordSelect(userId))
+			.select(wordSelect())
 			.from(vocabulary)
 			.leftJoin(
 				userWordState,
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const qNoSpaces = qLower.replace(/\s+/g, '');
 
 	const results = await db
-		.select(wordSelect(userId))
+		.select(wordSelect())
 		.from(vocabulary)
 		.leftJoin(
 			userWordState,

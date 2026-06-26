@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @plugin 'daisyui' {
-	themes: nord --default, dim --dark;
+	themes:
+		nord --default,
+		dim --dark;
 }
 
 @layer utilities {
@@ -16,12 +18,7 @@
 
 @layer base {
 	.hanzi {
-		font-family:
-			'Noto Serif CJK SC',
-			'Source Han Serif SC',
-			'STSong',
-			'SimSun',
-			serif;
+		font-family: 'Noto Serif CJK SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
 	}
 
 	.explanation-md strong {

@@ -54,7 +54,8 @@
 	}
 
 	const maskedExampleSentences = $derived.by(() => {
-		if (!currentWord?.exampleSentences || !currentWord.pinyin) return currentWord?.exampleSentences ?? null;
+		if (!currentWord?.exampleSentences || !currentWord.pinyin)
+			return currentWord?.exampleSentences ?? null;
 		const pattern = currentWord.pinyin
 			.split(/\s+/)
 			.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -278,10 +279,6 @@
 		await loadSessionWord(currentId, newSeenIds);
 	}
 
-	async function skip() {
-		await loadSessionWord(currentWord?.id ?? null, practiceSession.seenIds);
-	}
-
 	const LEVEL_COLORS = [
 		'badge-primary',
 		'badge-secondary',
@@ -374,8 +371,8 @@
 				<div class="mb-4 text-5xl">✓</div>
 				<h2 class="mb-2 text-2xl font-bold">Session complete!</h2>
 				<p class="mb-6 text-base-content/60">
-					You went through all {practiceSession.seenIds.length} words. {remaining} still to learn -
-					restart to practice them again.
+					You went through all {practiceSession.seenIds.length} words. {remaining} still to learn - restart
+					to practice them again.
 				</p>
 				<div class="flex flex-wrap justify-center gap-2">
 					<button
@@ -446,11 +443,7 @@
 						if (actionResult.type === 'success' && actionResult.data) {
 							const wordResult = actionResult.data as WordResult;
 
-							if (
-								!wordResult.correct &&
-								practiceSession.aiCheck &&
-								wordResult.userAnswer.trim()
-							) {
+							if (!wordResult.correct && practiceSession.aiCheck && wordResult.userAnswer.trim()) {
 								practiceSession.phase = 'checking';
 								try {
 									const res = await fetch('/api/check-answer', {
@@ -558,11 +551,7 @@
 					{/if}
 
 					<div class="mt-3 flex justify-center gap-2">
-						<button
-							class="btn gap-2 btn-outline btn-sm"
-							onclick={explain}
-							disabled={explaining}
-						>
+						<button class="btn gap-2 btn-outline btn-sm" onclick={explain} disabled={explaining}>
 							{#if explaining}
 								<Loader size={14} class="animate-spin" />
 								Explaining...
@@ -717,11 +706,7 @@
 				{/if}
 
 				<div class="flex justify-center gap-2">
-					<button
-						class="btn gap-2 btn-outline btn-sm"
-						onclick={explain}
-						disabled={explaining}
-					>
+					<button class="btn gap-2 btn-outline btn-sm" onclick={explain} disabled={explaining}>
 						{#if explaining}
 							<Loader size={14} class="animate-spin" />
 							Explaining...

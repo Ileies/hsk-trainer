@@ -2,7 +2,19 @@
 	import './layout.css';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { BookOpen, Sparkles, Settings, Search, Network, Home, LogOut, User } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import {
+		BookOpen,
+		Sparkles,
+		Settings,
+		Search,
+		Network,
+		Home,
+		LogOut,
+		User,
+		Library
+	} from '@lucide/svelte';
 	import MapCanvas from '$lib/MapCanvas.svelte';
 
 	let { children, data } = $props();
@@ -28,7 +40,7 @@
 	let searchInput: HTMLInputElement | undefined = $state();
 
 	$effect(() => {
-		page.url.pathname;
+		if (!page.url.pathname) return;
 		searchQuery = '';
 		dropdown = [];
 		showDropdown = false;
@@ -59,7 +71,7 @@
 		if (e.key === 'Enter' && searchQuery.trim()) {
 			e.preventDefault();
 			showDropdown = false;
-			goto(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+			goto(resolve(`/search?q=${encodeURIComponent(searchQuery.trim())}` as '/search'));
 		} else if (e.key === 'Escape') {
 			showDropdown = false;
 			searchInput?.blur();
@@ -69,15 +81,15 @@
 	function selectWord(id: number) {
 		showDropdown = false;
 		const q = searchQuery.trim();
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 		params.set('id', String(id));
 		if (q) params.set('q', q);
-		goto(`/search?${params}`);
+		goto(resolve(`/search?${params}` as '/search'));
 	}
 
 	function viewAll() {
 		showDropdown = false;
-		goto(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+		goto(resolve(`/search?q=${encodeURIComponent(searchQuery.trim())}` as '/search'));
 	}
 
 	function onFocusOut(e: FocusEvent) {
@@ -91,20 +103,22 @@
 
 <div class="h-dvh flex flex-col bg-base-200">
 	<!-- Desktop header (hidden on mobile) -->
-	<nav class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0 {isAuthPage ? 'hidden' : 'hidden md:flex'}">
+	<nav
+		class="navbar bg-base-100 shadow-sm px-4 lg:px-8 shrink-0 {isAuthPage
+			? 'hidden'
+			: 'hidden md:flex'}"
+	>
 		<div class="flex-none">
-			<a href="/" class="flex items-center gap-2 text-xl font-bold text-primary">
+			<a href={resolve('/')} class="flex items-center gap-2 text-xl font-bold text-primary">
 				<BookOpen size={24} />
 				<span class="hidden sm:inline">HSK Trainer</span>
 			</a>
 		</div>
 
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			class="relative flex-1 flex justify-center px-4"
-			onfocusout={onFocusOut}
-		>
-			<label class="input input-sm flex items-center gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
+		<div class="relative flex-1 flex justify-center px-4" onfocusout={onFocusOut}>
+			<label
+				class="input input-sm flex items-center gap-2 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg"
+			>
 				<Search size={14} class="text-base-content/40 shrink-0" />
 				<input
 					bind:this={searchInput}
@@ -127,7 +141,7 @@
 				<div
 					class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 bg-base-100 shadow-2xl rounded-2xl z-50 w-80 sm:w-96 border border-base-200 overflow-hidden"
 				>
-					{#each dropdown as word}
+					{#each dropdown as word (word.id)}
 						<button
 							class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors text-left"
 							onpointerdown={(e) => {
@@ -166,14 +180,14 @@
 
 		<div class="flex-none flex items-center gap-1 sm:gap-2">
 			<a
-				href="/"
+				href={resolve('/')}
 				class="btn btn-ghost btn-sm hidden sm:inline-flex"
 				class:btn-active={isDashboard}
 			>
 				Dashboard
 			</a>
 			<a
-				href="/explains"
+				href={resolve('/explains')}
 				class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"
 				class:btn-active={page.url.pathname.startsWith('/explains')}
 			>
@@ -181,7 +195,7 @@
 				Explains
 			</a>
 			<a
-				href="/map"
+				href={resolve('/map')}
 				class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"
 				class:btn-active={page.url.pathname === '/map'}
 			>
@@ -189,14 +203,22 @@
 				Map
 			</a>
 			<a
-				href="/practice"
+				href={resolve('/stories')}
+				class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"
+				class:btn-active={page.url.pathname.startsWith('/stories')}
+			>
+				<Library size={14} />
+				Stories
+			</a>
+			<a
+				href={resolve('/practice')}
 				class="btn btn-primary btn-sm"
 				class:btn-active={page.url.pathname.startsWith('/practice')}
 			>
 				Practice
 			</a>
 			<a
-				href="/settings"
+				href={resolve('/settings')}
 				class="btn btn-ghost btn-sm btn-square text-base-content/40 hover:text-base-content"
 				class:btn-active={page.url.pathname.startsWith('/settings')}
 				title="Settings"
@@ -225,7 +247,11 @@
 	</nav>
 
 	<!-- Map canvas - always mounted so it survives route changes -->
-	<div class="{isMap && !isAuthPage ? 'flex flex-col' : 'hidden'} flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
+	<div
+		class="{isMap && !isAuthPage
+			? 'flex flex-col'
+			: 'hidden'} flex-1 min-h-0 overflow-hidden pb-16 md:pb-0"
+	>
 		<MapCanvas words={data.words} />
 	</div>
 
@@ -245,7 +271,6 @@
 
 	<!-- Mobile search bar - only on dashboard, pinned above bottom nav -->
 	{#if isDashboard && !isAuthPage}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="fixed bottom-16 inset-x-0 bg-base-100 border-t border-base-200 px-4 py-2 z-40 md:hidden"
 			onfocusout={onFocusOut}
@@ -273,7 +298,7 @@
 					<div
 						class="absolute bottom-full mb-1.5 left-0 right-0 bg-base-100 shadow-2xl rounded-2xl z-50 border border-base-200 overflow-hidden"
 					>
-						{#each dropdown as word}
+						{#each dropdown as word (word.id)}
 							<button
 								class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 transition-colors text-left"
 								onpointerdown={(e) => {
@@ -313,39 +338,61 @@
 	{/if}
 
 	<!-- Mobile bottom navigation -->
-	<nav class="fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-200 z-50 md:hidden {isAuthPage ? 'hidden' : ''}">
+	<nav
+		class="fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-200 z-50 md:hidden {isAuthPage
+			? 'hidden'
+			: ''}"
+	>
 		<div class="flex h-16">
 			<a
-				href="/"
-				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {isDashboard ? 'text-primary' : 'text-base-content/40'}"
+				href={resolve('/')}
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {isDashboard
+					? 'text-primary'
+					: 'text-base-content/40'}"
 			>
 				<Home size={22} />
 				<span class="text-xs">Dashboard</span>
 			</a>
 			<a
-				href="/explains"
-				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/explains') ? 'text-primary' : 'text-base-content/40'}"
+				href={resolve('/explains')}
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith(
+					'/explains'
+				)
+					? 'text-primary'
+					: 'text-base-content/40'}"
 			>
 				<Sparkles size={22} />
 				<span class="text-xs">Explains</span>
 			</a>
 			<a
-				href="/map"
-				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname === '/map' ? 'text-primary' : 'text-base-content/40'}"
+				href={resolve('/stories')}
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith(
+					'/stories'
+				)
+					? 'text-primary'
+					: 'text-base-content/40'}"
 			>
-				<Network size={22} />
-				<span class="text-xs">Map</span>
+				<Library size={22} />
+				<span class="text-xs">Stories</span>
 			</a>
 			<a
-				href="/practice"
-				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/practice') ? 'text-primary' : 'text-base-content/40'}"
+				href={resolve('/practice')}
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith(
+					'/practice'
+				)
+					? 'text-primary'
+					: 'text-base-content/40'}"
 			>
 				<BookOpen size={22} />
 				<span class="text-xs">Practice</span>
 			</a>
 			<a
-				href="/settings"
-				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith('/settings') ? 'text-primary' : 'text-base-content/40'}"
+				href={resolve('/settings')}
+				class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors {page.url.pathname.startsWith(
+					'/settings'
+				)
+					? 'text-primary'
+					: 'text-base-content/40'}"
 			>
 				<Settings size={22} />
 				<span class="text-xs">Settings</span>

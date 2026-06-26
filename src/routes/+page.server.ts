@@ -35,14 +35,15 @@ export const actions: Actions = {
 			.where(eq(vocabulary.hskLevel, level));
 
 		if (vocabIds.length > 0) {
-			await db
-				.delete(userWordState)
-				.where(
-					and(
-						eq(userWordState.userId, userId),
-						sql`${userWordState.vocabId} IN (${sql.join(vocabIds.map((v) => sql`${v.id}`), sql`, `)})`
-					)
-				);
+			await db.delete(userWordState).where(
+				and(
+					eq(userWordState.userId, userId),
+					sql`${userWordState.vocabId} IN (${sql.join(
+						vocabIds.map((v) => sql`${v.id}`),
+						sql`, `
+					)})`
+				)
+			);
 		}
 	}
 };

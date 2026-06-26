@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { marked } from 'marked';
 	import { BookOpen, Trash2, Sparkles } from '@lucide/svelte';
 
@@ -14,7 +15,9 @@
 <div class="flex items-center justify-between mb-8">
 	<div>
 		<h1 class="text-3xl font-bold">Saved Explanations</h1>
-		<p class="text-base-content/60 mt-1">{data.explains.length} explanation{data.explains.length !== 1 ? 's' : ''} saved</p>
+		<p class="text-base-content/60 mt-1">
+			{data.explains.length} explanation{data.explains.length !== 1 ? 's' : ''} saved
+		</p>
 	</div>
 	<Sparkles size={32} class="text-primary opacity-40" />
 </div>
@@ -26,9 +29,10 @@
 				<BookOpen size={64} class="mx-auto mb-4 text-primary opacity-30" />
 				<h2 class="text-xl font-bold mb-2">No explanations yet</h2>
 				<p class="text-base-content/60">
-					When you get a word wrong in practice and click "Explain", the explanation will be saved here.
+					When you get a word wrong in practice and click "Explain", the explanation will be saved
+					here.
 				</p>
-				<a href="/practice" class="btn btn-primary mt-6">Start practicing</a>
+				<a href={resolve('/practice')} class="btn btn-primary mt-6">Start practicing</a>
 			</div>
 		</div>
 	</div>
@@ -39,7 +43,7 @@
 				<div class="card-body gap-3 py-5 px-6">
 					<div class="flex items-start justify-between gap-4">
 						<a
-							href="/search?id={item.vocabularyId}"
+							href={resolve(`/search?id=${item.vocabularyId}` as '/search')}
 							class="flex items-center gap-3 hover:opacity-70 transition-opacity"
 						>
 							<span class="hanzi text-3xl font-bold">{item.hanzi}</span>
@@ -66,7 +70,10 @@
 						</div>
 					{/if}
 
-					<div class="explanation-md text-sm text-base-content/80 leading-relaxed border-t border-base-200 pt-3">
+					<div
+						class="explanation-md text-sm text-base-content/80 leading-relaxed border-t border-base-200 pt-3"
+					>
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 						{@html marked.parse(item.explanation)}
 					</div>
 

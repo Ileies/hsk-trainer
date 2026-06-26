@@ -1,16 +1,9 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import {
-		GraduationCap,
-		BookOpen,
-		Zap,
-		ChevronRight,
-		Trophy,
-		Star
-	} from '@lucide/svelte';
+	import { resolve } from '$app/paths';
+	import { GraduationCap, BookOpen, Zap, ChevronRight, Trophy, Star } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
-
 
 	const totalWords = $derived(data.stats.reduce((sum, s) => sum + s.total, 0));
 	const totalLearned = $derived(data.stats.reduce((sum, s) => sum + (s.learned ?? 0), 0));
@@ -46,11 +39,11 @@
 			</p>
 		</div>
 		<div class="flex gap-2 justify-center sm:justify-end">
-			<a href="/starred" class="btn btn-ghost gap-2">
+			<a href={resolve('/starred')} class="btn btn-ghost gap-2">
 				<Star size={16} class="text-warning" />
 				Starred
 			</a>
-			<a href="/practice" class="btn btn-primary gap-2">
+			<a href={resolve('/practice')} class="btn btn-primary gap-2">
 				<Zap size={16} />
 				Practice All
 			</a>
@@ -67,10 +60,7 @@
 				</div>
 				<span class="text-2xl font-bold text-primary">{overallPct}%</span>
 			</div>
-			<progress
-				class="progress progress-primary w-full h-4"
-				value={totalLearned}
-				max={totalWords}
+			<progress class="progress progress-primary w-full h-4" value={totalLearned} max={totalWords}
 			></progress>
 			<div class="flex justify-between text-sm text-base-content/60 mt-1">
 				<span>{totalLearned.toLocaleString()} learned</span>
@@ -81,7 +71,7 @@
 
 	<!-- Per-level cards -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-		{#each data.stats as stat}
+		{#each data.stats as stat (stat.hskLevel)}
 			{@const learned = stat.learned ?? 0}
 			{@const remaining = stat.total - learned}
 			{@const pct = Math.round((learned / stat.total) * 100)}
@@ -95,10 +85,7 @@
 						<span class="badge badge-primary badge-sm">{pct}%</span>
 					</div>
 
-					<progress
-						class="progress progress-primary w-full"
-						value={learned}
-						max={stat.total}
+					<progress class="progress progress-primary w-full" value={learned} max={stat.total}
 					></progress>
 
 					<div class="flex justify-between text-sm text-base-content/60">
@@ -107,12 +94,15 @@
 					</div>
 
 					<div class="card-actions justify-end items-center mt-1 gap-2">
-						<a href="/finished?hsk={stat.hskLevel}" class="btn btn-sm gap-1">
+						<a
+							href={resolve(`/finished?hsk=${stat.hskLevel}` as '/finished')}
+							class="btn btn-sm gap-1"
+						>
 							<BookOpen size={14} />
 							Review
 						</a>
 						<a
-							href="/practice?hsk={stat.hskLevel}"
+							href={resolve(`/practice?hsk=${stat.hskLevel}` as '/practice')}
 							class="btn btn-sm gap-1"
 							class:btn-disabled={remaining === 0}
 						>
@@ -128,5 +118,4 @@
 			</div>
 		{/each}
 	</div>
-
 {/if}

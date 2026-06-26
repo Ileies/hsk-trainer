@@ -3,8 +3,7 @@ import { vocabulary } from '$lib/server/db/schema';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
-	const isAuthPage =
-		url.pathname === '/login' || url.pathname.startsWith('/auth/');
+	const isAuthPage = url.pathname === '/login' || url.pathname.startsWith('/auth/');
 
 	if (isAuthPage || !locals.user) {
 		return { words: [], user: locals.user };

@@ -13,7 +13,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const key = env.OPENAI_KEY;
 	if (!key) throw error(500, 'OPENAI_KEY is not configured');
 
-	const { wordId, hanzi, pinyin, pinyinPlain, english, explanation } = await request.json();
+	const { wordId, hanzi, pinyin } = await request.json();
 
 	const openai = new OpenAI({ apiKey: key });
 
@@ -49,10 +49,7 @@ Output ONLY a valid JSON object with a single key "english".`
 		throw error(500, 'AI returned incomplete data');
 	}
 
-	await db
-		.update(vocabulary)
-		.set({ english: corrected.english })
-		.where(eq(vocabulary.id, wordId));
+	await db.update(vocabulary).set({ english: corrected.english }).where(eq(vocabulary.id, wordId));
 
 	return json(corrected);
 };

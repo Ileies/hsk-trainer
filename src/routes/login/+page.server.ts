@@ -3,7 +3,13 @@ import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { users, authTokens, sessions } from '$lib/server/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
-import { generateToken, generatePin, TOKEN_DURATION_MS, SESSION_COOKIE, SESSION_DURATION_MS } from '$lib/server/auth';
+import {
+	generateToken,
+	generatePin,
+	TOKEN_DURATION_MS,
+	SESSION_COOKIE,
+	SESSION_DURATION_MS
+} from '$lib/server/auth';
 import { sendMagicLink } from '$lib/server/email';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -45,7 +51,11 @@ export const actions: Actions = {
 		const pin = ((data.get('pin') as string) ?? '').replace(/\s/g, '');
 
 		if (!pin || !/^\d{6}$/.test(pin)) {
-			return fail(400, { sent: true, email, pinError: 'Please enter the 6-digit PIN from your email.' });
+			return fail(400, {
+				sent: true,
+				email,
+				pinError: 'Please enter the 6-digit PIN from your email.'
+			});
 		}
 
 		const [row] = await db
@@ -63,7 +73,11 @@ export const actions: Actions = {
 			.limit(1);
 
 		if (!row) {
-			return fail(400, { sent: true, email, pinError: 'Invalid or expired PIN. Please try again.' });
+			return fail(400, {
+				sent: true,
+				email,
+				pinError: 'Invalid or expired PIN. Please try again.'
+			});
 		}
 
 		await db.update(authTokens).set({ used: true }).where(eq(authTokens.id, row.tokenId));

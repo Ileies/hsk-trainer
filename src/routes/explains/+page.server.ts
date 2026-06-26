@@ -9,7 +9,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const rows = await db
 		.select({ explains })
 		.from(explains)
-		.innerJoin(explainsUsers, and(eq(explainsUsers.explainId, explains.id), eq(explainsUsers.userId, userId)))
+		.innerJoin(
+			explainsUsers,
+			and(eq(explainsUsers.explainId, explains.id), eq(explainsUsers.userId, userId))
+		)
 		.orderBy(desc(explains.createdAt));
 	return { explains: rows.map((r) => r.explains) };
 };

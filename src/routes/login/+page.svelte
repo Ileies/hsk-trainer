@@ -19,8 +19,8 @@
 				<h1 class="text-2xl font-bold">HSK Trainer</h1>
 				{#if form?.sent}
 					<p class="text-base-content/60 text-sm">
-						Check your inbox at <strong>{form.email}</strong> and enter the PIN below, or click the
-						link in the email.
+						Check your inbox at <strong>{form.email}</strong> and enter the PIN below, or click the link
+						in the email.
 					</p>
 				{:else}
 					<p class="text-base-content/60 text-sm">Enter your email to receive a sign-in link.</p>

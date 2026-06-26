@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { forceSimulation, forceManyBody, forceLink, forceCenter } from 'd3-force';
-	import type { SimulationNodeDatum } from 'd3-force';
+	import type { SimulationLinkDatum, SimulationNodeDatum } from 'd3-force';
 	import { quadtree as d3quadtree } from 'd3-quadtree';
+	import { resolve } from '$app/paths';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { buildGraph, bfsDistances } from '$lib/mapGraph';
 	import type { Word, Edge } from '$lib/mapGraph';
 	import { Search, Crosshair } from '@lucide/svelte';
@@ -10,9 +12,10 @@
 	let { words }: { words: Word[] } = $props();
 
 	type SimNode = Word & SimulationNodeDatum & { degree: number };
+	type SimLink = SimulationLinkDatum<SimNode> & { source: SimNode; target: SimNode; score: number };
 
 	// HSK filter - all on by default (only controls visibility, not simulation)
-	let activeHsk = $state(new Set([1, 2, 3, 4, 5, 6]));
+	const activeHsk = new SvelteSet([1, 2, 3, 4, 5, 6]);
 	let visibleCount = $derived(words.filter((w) => activeHsk.has(w.hskLevel)).length);
 
 	// Canvas element
@@ -23,15 +26,15 @@
 	let nodes: SimNode[] = [];
 	let basePositions: { x: number; y: number }[] = []; // centered, pre-stretch
 	let keptEdges: Edge[] = [];
-	let adjacency = new Map<number, { neighborId: number; sharedChars: string[] }[]>();
-	let nodeById = $state(new Map<number, SimNode>());
+	let adjacency = new SvelteMap<number, { neighborId: number; sharedChars: string[] }[]>();
+	const nodeById = new SvelteMap<number, SimNode>();
 	let qt = d3quadtree<SimNode>()
 		.x((n: SimNode) => n.x ?? 0)
 		.y((n: SimNode) => n.y ?? 0);
 
 	// Focus
 	let focusedId = $state<number | null>(null);
-	let bfsResult = new Map<number, number>();
+	let bfsResult = new SvelteMap<number, number>();
 	// Pre-computed per-focus lists so render passes don't scan all 5k nodes / 30k edges each frame
 	let focusedEdges: typeof keptEdges = [];
 	let nearNodes: SimNode[] = [];
@@ -75,7 +78,7 @@
 	let dragLast = { x: 0, y: 0 };
 
 	// Multi-touch / pinch state
-	let activePointers = new Map<number, { x: number; y: number }>();
+	let activePointers = new SvelteMap<number, { x: number; y: number }>();
 	let lastPinchDist = 0;
 
 	// Map-local search
@@ -100,16 +103,20 @@
 			const data = JSON.parse(raw);
 			if (!Array.isArray(data) || data.length !== words.length) return null;
 			return data;
-		} catch { return null; }
+		} catch {
+			return null;
+		}
 	}
 
 	function saveCachedLayout(ns: SimNode[]) {
 		try {
 			localStorage.setItem(
 				LAYOUT_CACHE_KEY,
-				JSON.stringify(ns.map(n => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0 })))
+				JSON.stringify(ns.map((n) => ({ id: n.id, x: n.x ?? 0, y: n.y ?? 0 })))
 			);
-		} catch {}
+		} catch {
+			// Ignore storage quota/private mode failures.
+		}
 	}
 
 	const HSK_COLORS = ['#4ade80', '#60a5fa', '#facc15', '#fb923c', '#f87171', '#c084fc'];
@@ -141,25 +148,30 @@
 	function runSimulation(simWords: Word[]) {
 		focusedId = null;
 		hoverNode = null;
-		bfsResult = new Map();
+		bfsResult = new SvelteMap();
 
 		if (simWords.length === 0) {
-			nodes = []; keptEdges = []; adjacency = new Map(); nodeById = new Map();
+			nodes = [];
+			keptEdges = [];
+			adjacency = new SvelteMap();
+			nodeById.clear();
 			loading = false;
 			return;
 		}
 
 		const { edges, adjacency: adj } = buildGraph(simWords);
-		adjacency = adj;
+		adjacency = new SvelteMap(adj);
 		keptEdges = edges;
 
-		const degree = new Map<number, number>(simWords.map((w) => [w.id, 0]));
+		const degree = new SvelteMap<number, number>(simWords.map((w) => [w.id, 0]));
 		for (const edge of edges) {
 			degree.set(edge.sourceId, (degree.get(edge.sourceId) ?? 0) + 1);
 			degree.set(edge.targetId, (degree.get(edge.targetId) ?? 0) + 1);
 		}
 
-		const byDegree = [...simWords].sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0));
+		const byDegree = [...simWords].sort(
+			(a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0)
+		);
 		const connectedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) > 0);
 		const isolatedWords = byDegree.filter((w) => (degree.get(w.id) ?? 0) === 0);
 		const goldenAngle = Math.PI * (3 - Math.sqrt(5));
@@ -167,7 +179,10 @@
 		function finalize(connNodes: SimNode[]) {
 			const cx = connNodes.reduce((s, n) => s + (n.x ?? 0), 0) / connNodes.length;
 			const cy = connNodes.reduce((s, n) => s + (n.y ?? 0), 0) / connNodes.length;
-			for (const n of connNodes) { n.x = (n.x ?? 0) - cx; n.y = (n.y ?? 0) - cy; }
+			for (const n of connNodes) {
+				n.x = (n.x ?? 0) - cx;
+				n.y = (n.y ?? 0) - cy;
+			}
 
 			const clusterR = connNodes.reduce((r, n) => Math.max(r, Math.hypot(n.x ?? 0, n.y ?? 0)), 0);
 			const isoR = clusterR + 20;
@@ -182,13 +197,18 @@
 			saveCachedLayout(allNodes);
 
 			nodes = allNodes;
-			nodeById = new Map(allNodes.map(n => [n.id, n]));
-			basePositions = allNodes.map(n => ({ x: n.x ?? 0, y: n.y ?? 0 }));
+			nodeById.clear();
+			for (const n of allNodes) nodeById.set(n.id, n);
+			basePositions = allNodes.map((n) => ({ x: n.x ?? 0, y: n.y ?? 0 }));
 			applyLayout();
 
 			if (canvas) {
-				cam.x = canvas.width / 2; cam.y = canvas.height / 2; cam.scale = minScale;
-				camTarget.x = cam.x; camTarget.y = cam.y; camTarget.scale = minScale;
+				cam.x = canvas.width / 2;
+				cam.y = canvas.height / 2;
+				cam.scale = minScale;
+				camTarget.x = cam.x;
+				camTarget.y = cam.y;
+				camTarget.scale = minScale;
 			}
 			loading = false;
 			needsRedraw = true;
@@ -199,8 +219,8 @@
 		// Restore from localStorage cache - instant load on repeat visits
 		const cached = loadCachedLayout();
 		if (cached) {
-			const posMap = new Map(cached.map(p => [p.id, p]));
-			const connNodes: SimNode[] = connectedWords.map(w => {
+			const posMap = new SvelteMap(cached.map((p) => [p.id, p]));
+			const connNodes: SimNode[] = connectedWords.map((w) => {
 				const p = posMap.get(w.id) ?? { x: 0, y: 0 };
 				return { ...w, x: p.x, y: p.y, degree: degree.get(w.id) ?? 0 };
 			});
@@ -219,17 +239,23 @@
 			degree: degree.get(w.id) ?? 0
 		}));
 
-		const idToConn = new Map(connSimNodes.map(n => [n.id, n]));
+		const idToConn = new SvelteMap(connSimNodes.map((n) => [n.id, n]));
 		const simLinks = edges
-			.map(e => {
-				const s = idToConn.get(e.sourceId), t = idToConn.get(e.targetId);
+			.map((e): SimLink | null => {
+				const s = idToConn.get(e.sourceId),
+					t = idToConn.get(e.targetId);
 				return s && t ? { source: s, target: t, score: e.score } : null;
 			})
-			.filter((l): l is NonNullable<typeof l> => l !== null);
+			.filter((l): l is SimLink => l !== null);
 
 		const sim = forceSimulation(connSimNodes)
 			.force('charge', forceManyBody().strength(-80))
-			.force('link', forceLink(simLinks).distance((l: any) => 20 + 60 / (1 + l.score * 10)).strength(0.6))
+			.force(
+				'link',
+				forceLink<SimNode, SimLink>(simLinks)
+					.distance((l) => 20 + 60 / (1 + l.score * 10))
+					.strength(0.6)
+			)
 			.force('center', forceCenter(0, 0))
 			.stop();
 
@@ -274,10 +300,13 @@
 			}
 		}
 
-		let bboxMinX = Infinity, bboxMaxX = -Infinity;
-		let bboxMinY = Infinity, bboxMaxY = -Infinity;
+		let bboxMinX = Infinity,
+			bboxMaxX = -Infinity;
+		let bboxMinY = Infinity,
+			bboxMaxY = -Infinity;
 		for (const n of nodes) {
-			const nx = n.x ?? 0, ny = n.y ?? 0;
+			const nx = n.x ?? 0,
+				ny = n.y ?? 0;
 			if (nx < bboxMinX) bboxMinX = nx;
 			if (nx > bboxMaxX) bboxMaxX = nx;
 			if (ny < bboxMinY) bboxMinY = ny;
@@ -303,14 +332,14 @@
 		const node = nodeById.get(id);
 		if (!node) return;
 		focusedId = id;
-		bfsResult = bfsDistances(adjacency, id, 3);
+		bfsResult = new SvelteMap(bfsDistances(adjacency, id, 3));
 		// Pre-compute per-focus lists so render passes don't scan everything each frame
-		focusedEdges = keptEdges.filter(e => {
+		focusedEdges = keptEdges.filter((e) => {
 			const sd = bfsResult.get(e.sourceId) ?? Infinity;
 			const td = bfsResult.get(e.targetId) ?? Infinity;
 			return Math.min(sd, td) <= 2;
 		});
-		nearNodes = nodes.filter(n => {
+		nearNodes = nodes.filter((n) => {
 			const d = bfsResult.get(n.id);
 			return d !== undefined && d <= 2;
 		});
@@ -320,14 +349,6 @@
 			camTarget.x = canvas.width / 2 - (node.x ?? 0) * camTarget.scale;
 			camTarget.y = canvas.height / 2 - (node.y ?? 0) * camTarget.scale;
 		}
-	}
-
-	function defocus() {
-		focusedId = null;
-		bfsResult = new Map();
-		focusedEdges = [];
-		nearNodes = [];
-		needsRedraw = true;
 	}
 
 	function canvasToWorld(clientX: number, clientY: number): [number, number] {
@@ -530,7 +551,10 @@
 				const t = nodeById.get(edge.targetId);
 				if (!s || !t) continue;
 				if (!activeHsk.has(s.hskLevel) || !activeHsk.has(t.hskLevel)) continue;
-				const sx = s.x ?? 0, sy = s.y ?? 0, tx = t.x ?? 0, ty = t.y ?? 0;
+				const sx = s.x ?? 0,
+					sy = s.y ?? 0,
+					tx = t.x ?? 0,
+					ty = t.y ?? 0;
 				if (!inView(sx, sy) && !inView(tx, ty)) continue;
 				ctx.moveTo(sx, sy);
 				ctx.lineTo(tx, ty);
@@ -542,20 +566,25 @@
 		// combo is drawn with a single fill() call instead of one per node.
 		// Numeric key: hskLevel*10 + round(alpha*10) - avoids string allocation per node.
 		type Circle = [number, number, number]; // x, y, r
-		const batchMap = new Map<number, { color: string; alpha: number; plain: Circle[]; outlined: Circle[] }>();
+		const batchMap = new SvelteMap<
+			number,
+			{ color: string; alpha: number; plain: Circle[]; outlined: Circle[] }
+		>();
 
 		function batchNode(node: SimNode, d: number | undefined) {
 			const alpha = nodeAlpha(d);
 			if (alpha < 0.01) return;
-			const nx = node.x ?? 0, ny = node.y ?? 0;
+			const nx = node.x ?? 0,
+				ny = node.y ?? 0;
 			if (!inView(nx, ny)) return;
-			const r = focused
-				? nodeRadius(d) / cam.scale
-				: (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
+			const r = focused ? nodeRadius(d) / cam.scale : (3 + 2 * Math.sqrt(node.degree)) / cam.scale;
 			const color = hskColor(node.hskLevel);
 			const key = node.hskLevel * 10 + Math.round(alpha * 10);
 			let b = batchMap.get(key);
-			if (!b) { b = { color, alpha, plain: [], outlined: [] }; batchMap.set(key, b); }
+			if (!b) {
+				b = { color, alpha, plain: [], outlined: [] };
+				batchMap.set(key, b);
+			}
 			(node.hanzi.length === 1 ? b.outlined : b.plain).push([nx, ny, r]);
 		}
 
@@ -564,14 +593,23 @@
 				ctx.globalAlpha = alpha;
 				ctx.fillStyle = color;
 				ctx.beginPath();
-				for (const [x, y, r] of plain) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
-				for (const [x, y, r] of outlined) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+				for (const [x, y, r] of plain) {
+					ctx.moveTo(x + r, y);
+					ctx.arc(x, y, r, 0, Math.PI * 2);
+				}
+				for (const [x, y, r] of outlined) {
+					ctx.moveTo(x + r, y);
+					ctx.arc(x, y, r, 0, Math.PI * 2);
+				}
 				ctx.fill();
 				if (outlined.length > 0) {
 					ctx.strokeStyle = '#000000';
 					ctx.lineWidth = 1.5 / cam.scale;
 					ctx.beginPath();
-					for (const [x, y, r] of outlined) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
+					for (const [x, y, r] of outlined) {
+						ctx.moveTo(x + r, y);
+						ctx.arc(x, y, r, 0, Math.PI * 2);
+					}
 					ctx.stroke();
 				}
 			}
@@ -590,7 +628,7 @@
 		// Pass 2: focused edges - iterate pre-computed list (~hundreds, not 30k)
 		if (focused) {
 			type EBatch = { alpha: number; lw: number; lines: [number, number, number, number][] };
-			const eBatches = new Map<number, EBatch>();
+			const eBatches = new SvelteMap<number, EBatch>();
 			for (const edge of focusedEdges) {
 				const s = nodeById.get(edge.sourceId);
 				const t = nodeById.get(edge.targetId);
@@ -601,13 +639,19 @@
 				const nearDepth = Math.min(sd, td);
 				const farDepth = Math.max(sd, td);
 				if (nearDepth > 2) continue;
-				const sx = s.x ?? 0, sy = s.y ?? 0, tx = t.x ?? 0, ty = t.y ?? 0;
+				const sx = s.x ?? 0,
+					sy = s.y ?? 0,
+					tx = t.x ?? 0,
+					ty = t.y ?? 0;
 				if (!inView(sx, sy) && !inView(tx, ty)) continue;
 				const alpha = nearDepth === 0 ? 0.85 : edgeAlpha(farDepth) * 0.5;
 				const lw = (nearDepth === 0 ? 1.8 : 1) / cam.scale;
 				const key = Math.round(alpha * 100);
 				let b = eBatches.get(key);
-				if (!b) { b = { alpha, lw, lines: [] }; eBatches.set(key, b); }
+				if (!b) {
+					b = { alpha, lw, lines: [] };
+					eBatches.set(key, b);
+				}
 				b.lines.push([sx, sy, tx, ty]);
 			}
 			ctx.strokeStyle = '#777777';
@@ -615,7 +659,10 @@
 				ctx.globalAlpha = alpha;
 				ctx.lineWidth = lw;
 				ctx.beginPath();
-				for (const [sx, sy, tx, ty] of lines) { ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); }
+				for (const [sx, sy, tx, ty] of lines) {
+					ctx.moveTo(sx, sy);
+					ctx.lineTo(tx, ty);
+				}
 				ctx.stroke();
 			}
 		}
@@ -624,7 +671,8 @@
 		if (focused) {
 			const fn = nodeById.get(focusedId!);
 			if (fn && inView(fn.x ?? 0, fn.y ?? 0)) {
-				const nx = fn.x ?? 0, ny = fn.y ?? 0;
+				const nx = fn.x ?? 0,
+					ny = fn.y ?? 0;
 				const r = nodeRadius(0) / cam.scale;
 				ctx.globalAlpha = 0.2;
 				ctx.fillStyle = hskColor(fn.hskLevel);
@@ -651,12 +699,15 @@
 				const d = focused ? bfsResult.get(node.id) : undefined;
 				if (focused && (d === undefined || d > 2)) continue;
 				const showLabel = focused
-					? d !== undefined && d <= 1 ? cam.scale > 0.5 : cam.scale > 1.2
+					? d !== undefined && d <= 1
+						? cam.scale > 0.5
+						: cam.scale > 1.2
 					: cam.scale > 1.3;
 				if (!showLabel) continue;
 				const alpha = nodeAlpha(d);
 				if (alpha < 0.01) continue;
-				const nx = node.x ?? 0, ny = node.y ?? 0;
+				const nx = node.x ?? 0,
+					ny = node.y ?? 0;
 				if (!inView(nx, ny)) continue;
 				const r = focused
 					? nodeRadius(d) / cam.scale
@@ -683,7 +734,7 @@
 			if (!simulated) {
 				simulated = true;
 				loading = true;
-				bfsResult = new Map();
+				bfsResult = new SvelteMap();
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => runSimulation(words));
 				});
@@ -729,7 +780,7 @@
 		} else {
 			const word = words.find((w) => w.id === id);
 			if (word) {
-				activeHsk = new Set([...activeHsk, word.hskLevel]);
+				activeHsk.add(word.hskLevel);
 				needsRedraw = true;
 			}
 		}
@@ -759,11 +810,8 @@
 
 <div class="flex flex-col h-full">
 	<!-- Top strip: search + HSK filters -->
-	<div
-		class="flex items-center gap-3 px-4 h-12 bg-base-100 border-b border-base-200 shrink-0 z-10"
-	>
+	<div class="flex items-center gap-3 px-4 h-12 bg-base-100 border-b border-base-200 shrink-0 z-10">
 		<!-- Map-local search -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="relative flex items-center" onfocusout={onMapSearchFocusOut}>
 			<label class="input input-sm flex items-center gap-2 w-56">
 				<Search size={13} class="text-base-content/40 shrink-0" />
@@ -789,7 +837,7 @@
 				<div
 					class="absolute top-full mt-1 left-0 bg-base-100 shadow-2xl rounded-xl z-50 w-72 border border-base-200 overflow-hidden"
 				>
-					{#each mapDropdown as word}
+					{#each mapDropdown as word (word.id)}
 						<button
 							class="w-full flex items-center gap-3 px-3 py-2 hover:bg-base-200 transition-colors text-left"
 							onpointerdown={(e) => {
@@ -817,7 +865,7 @@
 
 		<!-- HSK level toggles -->
 		<div class="flex items-center gap-1.5">
-			{#each [1, 2, 3, 4, 5, 6] as level, i}
+			{#each [1, 2, 3, 4, 5, 6] as level, i (level)}
 				<button
 					class="badge badge-sm font-semibold cursor-pointer select-none transition-opacity border"
 					style="background-color: {activeHsk.has(level)
@@ -826,15 +874,17 @@
 						? '#111'
 						: HSK_COLORS[i]}; border-color: {HSK_COLORS[i]};"
 					onclick={() => {
-						const next = new Set(activeHsk);
-						next.has(level) ? next.delete(level) : next.add(level);
-						if (next.size === 0) return;
-						activeHsk = next;
+						if (activeHsk.has(level)) {
+							if (activeHsk.size === 1) return;
+							activeHsk.delete(level);
+						} else {
+							activeHsk.add(level);
+						}
 						needsRedraw = true;
 						if (focusedId !== null) {
 							const fn = nodeById.get(focusedId);
-							if (fn && !next.has(fn.hskLevel)) {
-								const fallback = nodes.find((n) => next.has(n.hskLevel));
+							if (fn && !activeHsk.has(fn.hskLevel)) {
+								const fallback = nodes.find((n) => activeHsk.has(n.hskLevel));
 								if (fallback) focusNode(fallback.id, false);
 							}
 						}
@@ -906,7 +956,9 @@
 		{#if focusedId !== null && !loading}
 			{@const fw = nodeById.get(focusedId)}
 			{#if fw}
-				<div class="absolute bottom-4 left-4 z-20 bg-base-100/90 backdrop-blur-sm rounded-xl px-3 py-2.5 shadow-lg border border-base-200 flex items-center gap-3 max-w-xs">
+				<div
+					class="absolute bottom-4 left-4 z-20 bg-base-100/90 backdrop-blur-sm rounded-xl px-3 py-2.5 shadow-lg border border-base-200 flex items-center gap-3 max-w-xs"
+				>
 					<span class="hanzi text-3xl font-bold text-primary leading-none">{fw.hanzi}</span>
 					<div class="flex-1 min-w-0">
 						<div class="font-medium text-sm leading-snug">{fw.pinyin}</div>
@@ -915,11 +967,12 @@
 							<span
 								class="badge badge-xs font-semibold"
 								style="background-color: {hskColor(fw.hskLevel)}; color: #111"
-							>HSK {fw.hskLevel}</span>
+								>HSK {fw.hskLevel}</span
+							>
 							<a
-								href="/search?q={encodeURIComponent(fw.hanzi)}"
-								class="text-xs text-primary/70 hover:text-primary transition-colors"
-							>details</a>
+								href={resolve(`/search?q=${encodeURIComponent(fw.hanzi)}` as '/search')}
+								class="text-xs text-primary/70 hover:text-primary transition-colors">details</a
+							>
 						</div>
 					</div>
 				</div>

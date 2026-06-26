@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { ArrowLeft, RotateCcw, CheckCircle } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -17,7 +19,7 @@
 	const title = $derived(data.hskLevel ? `HSK ${data.hskLevel} - Review` : 'Review vocabulary');
 
 	function toggleUrl(all: boolean) {
-		const params = new URLSearchParams();
+		const params = new SvelteURLSearchParams();
 		if (data.hskLevel) params.set('hsk', String(data.hskLevel));
 		if (all) params.set('all', '1');
 		return `/finished?${params.toString()}`;
@@ -29,7 +31,7 @@
 </svelte:head>
 
 <div class="flex items-center gap-3 mb-6">
-	<a href="/" class="btn btn-ghost btn-sm gap-1">
+	<a href={resolve('/')} class="btn btn-ghost btn-sm gap-1">
 		<ArrowLeft size={16} />
 		Dashboard
 	</a>
@@ -41,15 +43,12 @@
 
 <div class="tabs tabs-box mb-5 w-fit">
 	<a
-		href={toggleUrl(false)}
+		href={resolve(toggleUrl(false) as '/finished')}
 		class="tab {!data.showAll ? 'tab-active' : ''}"
 	>
 		Learned
 	</a>
-	<a
-		href={toggleUrl(true)}
-		class="tab {data.showAll ? 'tab-active' : ''}"
-	>
+	<a href={resolve(toggleUrl(true) as '/finished')} class="tab {data.showAll ? 'tab-active' : ''}">
 		All vocabulary
 	</a>
 </div>
@@ -63,11 +62,16 @@
 					<p class="text-base-content/50">No words found.</p>
 				{:else}
 					<p class="text-base-content/50">No learned words yet.</p>
-					<p class="text-base-content/40 text-sm mt-1">Words you learn while practicing will appear here.</p>
+					<p class="text-base-content/40 text-sm mt-1">
+						Words you learn while practicing will appear here.
+					</p>
 					{#if data.hskLevel}
-						<a href="/practice?hsk={data.hskLevel}" class="btn btn-primary btn-sm mt-6">Start practicing HSK {data.hskLevel}</a>
+						<a
+							href={resolve(`/practice?hsk=${data.hskLevel}` as '/practice')}
+							class="btn btn-primary btn-sm mt-6">Start practicing HSK {data.hskLevel}</a
+						>
 					{:else}
-						<a href="/practice" class="btn btn-primary btn-sm mt-6">Start practicing</a>
+						<a href={resolve('/practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
 					{/if}
 				{/if}
 			</div>
@@ -78,10 +82,13 @@
 		{data.words.length} word{data.words.length === 1 ? '' : 's'}
 	</p>
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-		{#each data.words as word}
+		{#each data.words as word (word.id)}
 			<a
-				href="/search?id={word.id}"
-				class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow {data.showAll && !word.learned ? 'opacity-50' : ''}"
+				href={resolve(`/search?id=${word.id}` as '/search')}
+				class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow {data.showAll &&
+				!word.learned
+					? 'opacity-50'
+					: ''}"
 			>
 				<div class="card-body py-4 px-5 gap-2">
 					<div class="flex items-start justify-between gap-2">

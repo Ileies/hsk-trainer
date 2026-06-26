@@ -7,7 +7,8 @@ import { explains, explainsCache, explainsUsers } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 function levenshtein(a: string, b: string): number {
-	const m = a.length, n = b.length;
+	const m = a.length,
+		n = b.length;
 	const dp = Array.from({ length: m + 1 }, (_, i) =>
 		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
 	);
@@ -124,7 +125,12 @@ Then two example sentences for "${pinyinPlain}", each on its own line: *pinyin w
 
 async function generate(openai: OpenAI, prompt: string): Promise<string> {
 	const call = (p: string) =>
-		openai.responses.create({ model: 'gpt-5.4-mini', store: false, service_tier: 'flex', input: p });
+		openai.responses.create({
+			model: 'gpt-5.4-mini',
+			store: false,
+			service_tier: 'flex',
+			input: p
+		});
 
 	let text = (await call(prompt)).output_text;
 	if (isPinyinHeavy(text)) {
@@ -158,11 +164,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			explanation = cached.explanation;
 		} else {
 			const openai = new OpenAI({ apiKey: key });
-			explanation = await generate(openai, buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel));
-			await db
-				.insert(explainsCache)
-				.values({ vocabId: wordId, explanation })
-				.onConflictDoNothing();
+			explanation = await generate(
+				openai,
+				buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
+			);
+			await db.insert(explainsCache).values({ vocabId: wordId, explanation }).onConflictDoNothing();
 		}
 	} else {
 		if (wordId && userAnswer) {
@@ -175,11 +181,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				explanation = cached.explanation;
 			} else {
 				const openai = new OpenAI({ apiKey: key });
-				explanation = await generate(openai, buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer));
+				explanation = await generate(
+					openai,
+					buildWrongPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer)
+				);
 			}
 		} else {
 			const openai = new OpenAI({ apiKey: key });
-			explanation = await generate(openai, buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel));
+			explanation = await generate(
+				openai,
+				buildBlankPrompt(hanzi, pinyin, pinyinPlain, english, hskLevel)
+			);
 		}
 	}
 
@@ -187,22 +199,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const normalizedAnswer = userAnswer || '';
 		const row = await db
 			.insert(explains)
-			.values({ vocabularyId: wordId, hanzi, pinyin, english, userAnswer: normalizedAnswer, explanation, createdAt: new Date() })
+			.values({
+				vocabularyId: wordId,
+				hanzi,
+				pinyin,
+				english,
+				userAnswer: normalizedAnswer,
+				explanation,
+				createdAt: new Date()
+			})
 			.onConflictDoNothing()
 			.returning({ id: explains.id });
 
-		const explainId = row[0]?.id ?? (
-			await db
-				.select({ id: explains.id })
-				.from(explains)
-				.where(and(eq(explains.vocabularyId, wordId), eq(explains.userAnswer, normalizedAnswer)))
-				.limit(1)
-		)[0].id;
+		const explainId =
+			row[0]?.id ??
+			(
+				await db
+					.select({ id: explains.id })
+					.from(explains)
+					.where(and(eq(explains.vocabularyId, wordId), eq(explains.userAnswer, normalizedAnswer)))
+					.limit(1)
+			)[0].id;
 
-		await db
-			.insert(explainsUsers)
-			.values({ explainId, userId })
-			.onConflictDoNothing();
+		await db.insert(explainsUsers).values({ explainId, userId }).onConflictDoNothing();
 	}
 
 	return json({ explanation });

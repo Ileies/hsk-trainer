@@ -13,7 +13,11 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		.select()
 		.from(authTokens)
 		.where(
-			and(eq(authTokens.token, token), eq(authTokens.used, false), gt(authTokens.expiresAt, new Date()))
+			and(
+				eq(authTokens.token, token),
+				eq(authTokens.used, false),
+				gt(authTokens.expiresAt, new Date())
+			)
 		)
 		.limit(1);
 
