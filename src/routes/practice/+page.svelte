@@ -311,9 +311,9 @@
 	<div class="flex flex-col items-end gap-1 self-start sm:self-center">
 		<label
 			class="flex cursor-pointer items-center gap-1.5"
-			title="KI bewertet ob Fehler wirklich falsch sind"
+			title="AI checks whether mistakes are really wrong"
 		>
-			<span class="text-xs text-base-content/40">KI-Check</span>
+			<span class="text-xs text-base-content/40">AI Check</span>
 			<input
 				type="checkbox"
 				class="toggle toggle-primary toggle-xs"
@@ -606,14 +606,14 @@
 							class="btn mt-2 text-base-content/40 btn-ghost btn-xs"
 							onclick={() => (practiceSession.showHint = false)}
 						>
-							Tipp verstecken
+							Hide hint
 						</button>
 					{:else}
 						<button
 							class="btn gap-1 text-base-content/50 btn-ghost btn-sm"
 							onclick={() => (practiceSession.showHint = true)}
 						>
-							Tipp anzeigen
+							Show hint
 						</button>
 					{/if}
 				</div>
@@ -625,7 +625,7 @@
 	<div class="card mx-auto max-w-xl bg-base-100 shadow-lg">
 		<div class="card-body items-center gap-3 py-16">
 			<Loader size={28} class="animate-spin text-primary" />
-			<p class="text-sm text-base-content/50">KI bewertet die Antwort...</p>
+			<p class="text-sm text-base-content/50">AI is checking your answer...</p>
 		</div>
 	</div>
 {:else if practiceSession.phase === 'feedback' && practiceSession.result}
