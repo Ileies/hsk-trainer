@@ -2,6 +2,7 @@
 	"name": "hsk-trainer",
 	"private": true,
 	"version": "0.0.1",
+	"homepage": "https://hsk-trainer.ileies.de",
 	"type": "module",
 	"scripts": {
 		"dev": "bun --bun vite dev",
