@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { resolve } from '$app/paths';
-	import { GraduationCap, BookOpen, Zap, ChevronRight, Trophy, Star } from '@lucide/svelte';
+	import { GraduationCap, BookOpen, Zap, ChevronRight, Trophy, Star, User, LogOut } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -118,4 +118,25 @@
 			</div>
 		{/each}
 	</div>
+
+	<!-- Mobile-only: account section -->
+	{#if data.user}
+		<div class="md:hidden mt-4 card bg-base-100 shadow-sm">
+			<div class="card-body py-4 flex-row items-center gap-3">
+				<div class="text-base-content/40">
+					<User size={18} />
+				</div>
+				<span class="flex-1 text-sm text-base-content/70 truncate">{data.user.email}</span>
+				<form method="POST" action="/auth/logout">
+					<button
+						type="submit"
+						class="btn btn-ghost btn-sm gap-1.5 text-base-content/50 hover:text-error"
+					>
+						<LogOut size={14} />
+						Sign out
+					</button>
+				</form>
+			</div>
+		</div>
+	{/if}
 {/if}
