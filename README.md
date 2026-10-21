@@ -148,7 +148,7 @@ src/
       star/                 # Toggle star on a word
 scripts/
   generate-sentences.ts     # AI-generates example sentences and writes them to the DB
-  deploy.ts                 # SCP deploy to production
+  deploy.ts                 # Rsync deploy to production with systemd restart
 ```
 
 ## Production Deployment
@@ -160,7 +160,7 @@ bun run build
 bun run deploy
 ```
 
-`deploy` compresses the `build/` output and `.env` into an archive, uploads it via `scp` to `ros:/var/www/hsk-trainer`, extracts it there (preserving `local.db`), and restarts the app with PM2.
+`deploy` copies `package.json` and `bun.lock` into `build/` and installs production dependencies there with `bun install --production --frozen-lockfile --ignore-scripts`. It then rsyncs the output to `home:/var/www/hsk-trainer`, preserving the server's `.env`, `local.db` (including SQLite sidecars), and `data/`. Finally, it restarts `hsk-trainer.service` via systemd and checks that the service is active.
 
 The SQLite file is the only persistent state; back it up to preserve study progress.
 
