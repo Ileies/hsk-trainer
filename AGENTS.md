@@ -188,7 +188,7 @@ All three return 500 if `OPENAI_KEY` is unset. The UI handles this gracefully (b
 
 **`scripts/generate-sentences.ts`** - AI-generates example sentences for vocabulary words that have none. Uses OpenAI with concurrency 20, writes results back to `vocabulary.example_sentences`. Run with `bun scripts/generate-sentences.ts [--limit N]`.
 
-**`scripts/deploy.ts`** - compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), restarts via PM2. Run via `bun run deploy`.
+**`scripts/deploy.ts`** - installs production dependencies in `build/`, rsyncs to `home:/var/www/hsk-trainer`, and restarts `hsk-trainer.service` via systemd. Preserves the server's `.env`, `local.db` (including SQLite sidecars), and `data/`. Run via `bun run deploy`.
 
 **Migration scripts** (one-time, keep for reference):
 
@@ -230,7 +230,7 @@ bun run dev
 bun run build && bun run deploy
 ```
 
-Compresses `build/` + `.env`, uploads via SCP to `ros:/var/www/hsk-trainer`, extracts (preserving `local.db`), and restarts via PM2. Configured in `scripts/deploy.ts`.
+Copies `package.json` and `bun.lock` into `build/`, runs `bun install --production --frozen-lockfile --ignore-scripts` there, then rsyncs to `home:/var/www/hsk-trainer`. Preserves the server's `.env`, `local.db` (including SQLite sidecars), and `data/`. Restarts `hsk-trainer.service` via systemd and checks that it is active. Configured in `scripts/deploy.ts`.
 
 **Required env vars for production:** `DATABASE_URL`, `SMTP_HOST`, and at least `SMTP_FROM`. Optional: `OPENAI_KEY`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `ADMIN_MAIL`.
 

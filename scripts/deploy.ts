@@ -1,32 +1,27 @@
 import { $ } from 'bun';
+import { copyFile } from 'node:fs/promises';
 
-const REMOTE_DIR = `/var/www/hsk-trainer`;
+const REMOTE_HOST = 'home';
+const REMOTE_DIR = '/var/www/hsk-trainer';
+const SERVICE = 'hsk-trainer.service';
 
 try {
-	// Compress build directory
-	console.log('Compressing build directory...');
-	await $`tar -czf ./build.tar.gz -C ./build . -C .. .env`;
+	if (!(await Bun.file('build/index.js').exists())) {
+		throw new Error('Build output is missing. Run bun run build before deploying.');
+	}
 
-	// Upload compressed build
-	console.log('Uploading compressed build...');
-	await $`scp ./build.tar.gz ros:/tmp/build.tar.gz`;
+	console.log('Installing production dependencies in build/...');
+	await copyFile('package.json', 'build/package.json');
+	await copyFile('bun.lock', 'build/bun.lock');
+	// The prepare script needs development tools, which are unnecessary in the built server.
+	await $`bun install --production --frozen-lockfile --ignore-scripts`.cwd('build');
 
-	// Clean remote directory (preserving data folder, db, and env)
-	console.log('Cleaning remote directory...');
-	await $`ssh ros "find ${REMOTE_DIR} -mindepth 1 -maxdepth 1 ! -name 'local.db' ! -name 'pm2.config.cjs' -exec rm -rf {} +"`;
+	console.log('Syncing build to server...');
+	await $`rsync -az --delete --exclude=/.env ${'--exclude=/local.db*'} --exclude=/data/ ./build/ ${REMOTE_HOST}:${REMOTE_DIR}/`;
 
-	// Extract build on server
-	console.log('Extracting build on server...');
-	await $`ssh ros "tar -xzf /tmp/build.tar.gz -C ${REMOTE_DIR}"`;
-
-	// Clean up temporary file
-	console.log('Cleaning up temporary files...');
-	await $`ssh ros "rm /tmp/build.tar.gz"`;
-	await $`rm ./build.tar.gz`;
-
-	// Restart application
-	console.log('Restarting application...');
-	await $`ssh ros "pm2 restart hsk-trainer"`;
+	console.log('Restarting systemd service...');
+	await $`ssh ${REMOTE_HOST} systemctl restart ${SERVICE}`;
+	await $`ssh ${REMOTE_HOST} systemctl is-active --quiet ${SERVICE}`;
 
 	console.log('Deployment completed successfully!');
 } catch (error) {
