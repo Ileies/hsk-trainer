@@ -1,8 +1,7 @@
 import { Database } from 'bun:sqlite';
-import path from 'path';
+import { getDatabasePath } from '$lib/server/db/path';
 
-const dbPath = path.resolve(import.meta.dir, '..', 'local.db');
-const db = new Database(dbPath);
+const db = new Database(getDatabasePath());
 
 db.run('BEGIN');
 try {

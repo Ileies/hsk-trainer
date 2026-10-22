@@ -5,6 +5,7 @@ node_modules
 !.prettierrc
 !.env.example
 /build
+/data
 
 # Vite
 vite.config.js.timestamp-*

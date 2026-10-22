@@ -12,9 +12,9 @@
  *    sentences must not have its zh value mutated by this script.
  */
 import { Database } from 'bun:sqlite';
-import path from 'path';
+import { getDatabasePath } from '$lib/server/db/path';
 
-const db = new Database(path.join(import.meta.dir, '..', 'local.db'));
+const db = new Database(getDatabasePath());
 db.run('PRAGMA foreign_keys = ON');
 
 type WordRef = [en: string, zh: string];

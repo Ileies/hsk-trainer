@@ -6,9 +6,9 @@
  */
 
 import { Database } from 'bun:sqlite';
-import path from 'path';
+import { getDatabasePath } from '$lib/server/db/path';
 
-const db = new Database(path.join(import.meta.dir, '..', 'local.db'));
+const db = new Database(getDatabasePath());
 db.run('PRAGMA journal_mode = WAL');
 
 // ---------------------------------------------------------------------------

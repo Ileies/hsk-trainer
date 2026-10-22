@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite';
+import { getDatabasePath } from '$lib/server/db/path';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { vocabulary } from '../src/lib/server/db/schema';
 import { isNull, eq } from 'drizzle-orm';
@@ -16,7 +17,7 @@ if (!key) {
 }
 
 const openai = new OpenAI({ apiKey: key, timeout: 30_000 });
-const db = drizzle(new Database('local.db'));
+const db = drizzle(new Database(getDatabasePath()));
 
 interface WordRow {
 	id: number;

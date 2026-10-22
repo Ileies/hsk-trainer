@@ -9,8 +9,9 @@
  */
 
 import { Database } from 'bun:sqlite';
+import { getDatabasePath } from '$lib/server/db/path';
 
-const db = new Database('local.db');
+const db = new Database(getDatabasePath());
 
 const tables = (
 	db.query("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]
