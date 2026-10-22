@@ -84,7 +84,7 @@ Open [http://localhost:5173](http://localhost:5173).
 
 | Variable       | Required | Description                                              |
 | -------------- | -------- | -------------------------------------------------------- |
-| `DATABASE_URL` | Yes      | Path to the SQLite file (default: `local.db`)            |
+| `DATA_DIR`     | No       | Persistent data directory (default: `./data`), containing `local.db` |
 | `OPENAI_KEY`   | No       | OpenAI API key. AI features are disabled when unset.     |
 | `SMTP_HOST`    | Yes      | SMTP server hostname for sending login emails            |
 | `SMTP_PORT`    | No       | SMTP port (default: `587`)                               |
@@ -93,6 +93,12 @@ Open [http://localhost:5173](http://localhost:5173).
 | `SMTP_PASS`    | No       | SMTP auth password                                       |
 | `SMTP_FROM`    | No       | From address (defaults to `noreply@<hostname>`)          |
 | `ADMIN_MAIL`   | No       | Email address that may use the flashcard repair endpoint |
+
+Relative `DATA_DIR` paths resolve from the working directory. The directory is created automatically. The app, Drizzle commands, and database scripts use the same setting.
+
+For an existing installation, stop the app and move `local.db` and any `local.db-wal` / `local.db-shm` files into `DATA_DIR` before restarting. Set `DATA_DIR=.` to keep using a database in the project root.
+
+For production, use `./data` (preserved by deployment) or an absolute path outside the deployment directory.
 
 ## Scripts
 

@@ -9,7 +9,7 @@ A self-hosted SvelteKit flashcard app for learning Chinese vocabulary from the o
 - **Runtime / package manager:** Bun
 - **Framework:** SvelteKit 2 with **Svelte 5 Runes** enforced project-wide (`runes: true` in `svelte.config.js`) - never use legacy stores or Svelte 4 patterns
 - **Styling:** Tailwind CSS v4 + DaisyUI v5
-- **Database:** SQLite via Drizzle ORM + `better-sqlite3`; database file is `local.db`
+- **Database:** SQLite via Drizzle ORM + `bun:sqlite`; database file is `DATA_DIR/local.db` (`DATA_DIR` defaults to `./data`)
 - **AI:** OpenAI SDK (`openai` package), using `openai.responses.create` (not `chat.completions`)
 - **Adapter:** `@sveltejs/adapter-node` - builds to `build/` as a standalone server
 - **Imports:** always use `$lib/` aliases, never relative paths from `src/`
@@ -232,7 +232,7 @@ bun run build && bun run deploy
 
 Copies `package.json` and `bun.lock` into `build/`, runs `bun install --production --frozen-lockfile --ignore-scripts` there, then rsyncs to `home:/var/www/hsk-trainer`. Preserves the server's `.env`, `local.db` (including SQLite sidecars), and `data/`. Restarts `hsk-trainer.service` via systemd and checks that it is active. Configured in `scripts/deploy.ts`.
 
-**Required env vars for production:** `DATABASE_URL`, `SMTP_HOST`, and at least `SMTP_FROM`. Optional: `OPENAI_KEY`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `ADMIN_MAIL`.
+**Required env vars for production:** `SMTP_HOST`, and at least `SMTP_FROM`. Optional: `DATA_DIR` (defaults to `./data`), `OPENAI_KEY`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `ADMIN_MAIL`.
 
 **Inspect the database:**
 
