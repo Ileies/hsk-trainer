@@ -51,7 +51,7 @@ A self-hosted flashcard web app for learning Chinese vocabulary from the officia
 | AI            | [OpenAI SDK](https://github.com/openai/openai-node) (gpt-5.4-nano for grading, gpt-5.4-mini for explanations)     |
 | Email         | [Nodemailer](https://nodemailer.com) (magic link + PIN delivery)                                                  |
 | Visualisation | [d3-force](https://d3js.org/d3-force) + [d3-quadtree](https://d3js.org/d3-quadtree), rendered on Canvas           |
-| Adapter       | `@sveltejs/adapter-node` (standalone Node/Bun server)                                                             |
+| Adapter       | `@sveltejs/adapter-bun` (standalone Bun server)                                                                   |
 
 ## Getting Started
 

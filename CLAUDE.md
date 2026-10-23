@@ -11,7 +11,7 @@ A self-hosted SvelteKit flashcard app for learning Chinese vocabulary from the o
 - **Styling:** Tailwind CSS v4 + DaisyUI v5
 - **Database:** SQLite via Drizzle ORM + `bun:sqlite`; database file is `DATA_DIR/local.db` (`DATA_DIR` defaults to `./data`)
 - **AI:** OpenAI SDK (`openai` package), using `openai.responses.create` (not `chat.completions`)
-- **Adapter:** `@sveltejs/adapter-node` - builds to `build/` as a standalone server
+- **Adapter:** `@sveltejs/adapter-bun` - builds to `build/` as a standalone Bun server
 - **Imports:** always use `#lib/` aliases, never relative paths from `src/`
 
 ## Database schema
