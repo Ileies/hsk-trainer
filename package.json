@@ -62,5 +62,8 @@
 	"dependencies": {
 		"nodemailer": "^8.0.10",
 		"openai": "^6.41.0"
+	},
+	"patchedDependencies": {
+		"drizzle-kit@0.31.10": "patches/drizzle-kit@0.31.10.patch"
 	}
 }

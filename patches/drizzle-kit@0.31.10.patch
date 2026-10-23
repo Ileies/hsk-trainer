@@ -1,0 +1,39 @@
+diff --git a/api.js b/api.js
+index f4ecb91959f62fc938416a0585458c0a710af161..3e4f89119b53e920f365c4cde3cd415a1ee87f50 100644
+--- a/api.js
++++ b/api.js
+@@ -15680,7 +15680,7 @@ var init_sqlitePushUtils = __esm({
+         }
+       }
+       return {
+-        statementsToExecute,
++        statementsToExecute: [...new Set(statementsToExecute)],
+         shouldAskForApprove,
+         infoToPrint,
+         columnsToRemove: [...new Set(columnsToRemove)],
+diff --git a/api.mjs b/api.mjs
+index a940272dfb05accf57a472c46c52652ec9ad0080..92efb47d982e599a06cdd2a6b7d131efdd47e3ee 100644
+--- a/api.mjs
++++ b/api.mjs
+@@ -15685,7 +15685,7 @@ var init_sqlitePushUtils = __esm({
+         }
+       }
+       return {
+-        statementsToExecute,
++        statementsToExecute: [...new Set(statementsToExecute)],
+         shouldAskForApprove,
+         infoToPrint,
+         columnsToRemove: [...new Set(columnsToRemove)],
+diff --git a/bin.cjs b/bin.cjs
+index 07274ea6f53fd54a129b3d338892feda6e995cff..f2212b040c64b849a3365b7066e35d395fb856da 100755
+--- a/bin.cjs
++++ b/bin.cjs
+@@ -25701,7 +25701,7 @@ var init_sqlitePushUtils = __esm({
+         }
+       }
+       return {
+-        statementsToExecute,
++        statementsToExecute: [...new Set(statementsToExecute)],
+         shouldAskForApprove,
+         infoToPrint,
+         columnsToRemove: [...new Set(columnsToRemove)],

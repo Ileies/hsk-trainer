@@ -1,5 +1,5 @@
 import { $ } from 'bun';
-import { copyFile } from 'node:fs/promises';
+import { copyFile, cp } from 'node:fs/promises';
 
 const REMOTE_HOST = 'home';
 const REMOTE_DIR = '/var/www/hsk-trainer';
@@ -13,6 +13,7 @@ try {
 	console.log('Installing production dependencies in build/...');
 	await copyFile('package.json', 'build/package.json');
 	await copyFile('bun.lock', 'build/bun.lock');
+	await cp('patches', 'build/patches', { recursive: true });
 	// The prepare script needs development tools, which are unnecessary in the built server.
 	await $`bun install --production --frozen-lockfile --ignore-scripts`.cwd('build');
 
