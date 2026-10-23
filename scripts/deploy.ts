@@ -1,7 +1,7 @@
 import { $ } from 'bun';
 import { copyFile, cp } from 'node:fs/promises';
 
-const REMOTE_HOST = 'home';
+const REMOTE_HOST = 'ros';
 const REMOTE_DIR = '/var/www/hsk-trainer';
 const SERVICE = 'hsk-trainer.service';
 
