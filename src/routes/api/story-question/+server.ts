@@ -1,15 +1,15 @@
 import type { RequestHandler } from './$types';
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import OpenAI from 'openai';
-import { env } from '$env/dynamic/private';
-import { db } from '$lib/server/db';
-import { stories, wordMap, vocabulary } from '$lib/server/db/schema';
+import { OPENAI_KEY } from '$app/env/private';
+import { db } from '#lib/server/db/index.js';
+import { stories, wordMap, vocabulary } from '#lib/server/db/schema.js';
 import { eq, inArray } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) error(401, 'Unauthorized');
 
-	const key = env.OPENAI_KEY;
+	const key = OPENAI_KEY;
 	if (!key) error(500, 'OPENAI_KEY is not configured');
 
 	const body = await request.json();
@@ -92,5 +92,5 @@ Answer in 2-4 sentences. Assume the student knows HSK 1-${story.hskLevel} vocabu
 		input: prompt
 	});
 
-	return json({ answer: response.output_text });
+	return Response.json({ answer: response.output_text });
 };

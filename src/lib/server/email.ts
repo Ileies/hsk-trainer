@@ -1,23 +1,26 @@
 import nodemailer from 'nodemailer';
-import { env } from '$env/dynamic/private';
+
+import {
+	SMTP_HOST,
+	SMTP_PORT,
+	SMTP_SECURE,
+	SMTP_USER,
+	SMTP_PASS,
+	SMTP_FROM
+} from '$app/env/private';
 
 export async function sendMagicLink(toEmail: string, token: string, pin: string, origin: string) {
 	const transporter = nodemailer.createTransport({
-		host: env.SMTP_HOST,
-		port: parseInt(env.SMTP_PORT ?? '587'),
-		secure: env.SMTP_SECURE === 'true',
-		auth: env.SMTP_USER
-			? {
-					user: env.SMTP_USER,
-					pass: env.SMTP_PASS
-				}
-			: undefined
+		host: SMTP_HOST,
+		port: parseInt(SMTP_PORT ?? '587'),
+		secure: SMTP_SECURE === 'true',
+		auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined
 	});
 
 	const url = `${origin}/auth/verify?token=${token}`;
 
 	await transporter.sendMail({
-		from: env.SMTP_FROM ?? `noreply@${new URL(origin).hostname}`,
+		from: SMTP_FROM ?? `noreply@${new URL(origin).hostname}`,
 		to: toEmail,
 		subject: 'Sign in to HSK Trainer',
 		text: `Your sign-in PIN is: ${pin}\n\nOr click this link to sign in directly:\n${url}\n\nBoth expire in 15 minutes.`,

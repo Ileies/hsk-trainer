@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
-import { db } from '$lib/server/db';
-import { explains, explainsUsers } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { explains, explainsUsers } from '#lib/server/db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 

@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { getDatabasePath } from '$lib/server/db/path';
+import { getDatabasePath } from '#lib/server/db/path.js';
 
 const db = new Database(getDatabasePath());
 

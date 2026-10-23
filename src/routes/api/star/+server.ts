@@ -1,6 +1,6 @@
-import { json, error } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { userWordState } from '$lib/server/db/schema';
+import { error } from '@sveltejs/kit';
+import { db } from '#lib/server/db/index.js';
+import { userWordState } from '#lib/server/db/schema.js';
 
 export async function POST({ request, locals }) {
 	if (!locals.user) error(401, 'Unauthorized');
@@ -17,5 +17,5 @@ export async function POST({ request, locals }) {
 			set: { starred }
 		});
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 }

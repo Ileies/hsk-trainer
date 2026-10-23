@@ -32,7 +32,7 @@
 					When you get a word wrong in practice and click "Explain", the explanation will be saved
 					here.
 				</p>
-				<a href={resolve('/practice')} class="btn btn-primary mt-6">Start practicing</a>
+				<a href={resolve('practice')} class="btn btn-primary mt-6">Start practicing</a>
 			</div>
 		</div>
 	</div>
@@ -43,7 +43,7 @@
 				<div class="card-body gap-3 py-5 px-6">
 					<div class="flex items-start justify-between gap-4">
 						<a
-							href={resolve(`/search?id=${item.vocabularyId}` as '/search')}
+							href={`${resolve('/search')}?id=${item.vocabularyId}`}
 							class="flex items-center gap-3 hover:opacity-70 transition-opacity"
 						>
 							<span class="hanzi text-3xl font-bold">{item.hanzi}</span>

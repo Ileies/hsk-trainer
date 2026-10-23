@@ -22,7 +22,7 @@
 		const params = new SvelteURLSearchParams();
 		if (data.hskLevel) params.set('hsk', String(data.hskLevel));
 		if (all) params.set('all', '1');
-		return `/finished?${params.toString()}`;
+		return `${resolve('/finished')}?${params.toString()}`;
 	}
 </script>
 
@@ -42,15 +42,8 @@
 </div>
 
 <div class="tabs tabs-box mb-5 w-fit">
-	<a
-		href={resolve(toggleUrl(false) as '/finished')}
-		class="tab {!data.showAll ? 'tab-active' : ''}"
-	>
-		Learned
-	</a>
-	<a href={resolve(toggleUrl(true) as '/finished')} class="tab {data.showAll ? 'tab-active' : ''}">
-		All vocabulary
-	</a>
+	<a href={toggleUrl(false)} class="tab {!data.showAll ? 'tab-active' : ''}"> Learned </a>
+	<a href={toggleUrl(true)} class="tab {data.showAll ? 'tab-active' : ''}"> All vocabulary </a>
 </div>
 
 {#if data.words.length === 0}
@@ -67,11 +60,11 @@
 					</p>
 					{#if data.hskLevel}
 						<a
-							href={resolve(`/practice?hsk=${data.hskLevel}` as '/practice')}
+							href={`${resolve('/practice')}?hsk=${data.hskLevel}`}
 							class="btn btn-primary btn-sm mt-6">Start practicing HSK {data.hskLevel}</a
 						>
 					{:else}
-						<a href={resolve('/practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
+						<a href={resolve('practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
 					{/if}
 				{/if}
 			</div>
@@ -84,7 +77,7 @@
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 		{#each data.words as word (word.id)}
 			<a
-				href={resolve(`/search?id=${word.id}` as '/search')}
+				href={`${resolve('/search')}?id=${word.id}`}
 				class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md transition-shadow {data.showAll &&
 				!word.learned
 					? 'opacity-50'

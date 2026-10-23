@@ -147,6 +147,7 @@
 			t1 = a.ti,
 			s2 = b.si,
 			t2 = b.ti;
+
 		if (s1 > s2 || (s1 === s2 && t1 > t2)) {
 			[s1, t1, s2, t2] = [s2, t2, s1, t1];
 		}
@@ -504,9 +505,10 @@
 <div class="space-y-6 pb-32">
 	<!-- Header -->
 	<div class="flex items-start gap-3">
-		<a href={resolve('/stories')} class="btn btn-ghost btn-sm btn-square mt-0.5 shrink-0">
-			<ArrowLeft size={16} />
-		</a>
+		<a href={resolve('stories')} class="btn btn-ghost btn-sm btn-square mt-0.5 shrink-0"
+			><ArrowLeft size={16} /></a
+		>
+
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2 flex-wrap">
 				<h1 class="text-2xl font-bold hanzi">{data.story.title}</h1>

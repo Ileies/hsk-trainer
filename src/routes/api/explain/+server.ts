@@ -1,9 +1,9 @@
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import OpenAI from 'openai';
-import { env } from '$env/dynamic/private';
+import { OPENAI_KEY } from '$app/env/private';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { explains, explainsCache, explainsUsers } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { explains, explainsCache, explainsUsers } from '#lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 function levenshtein(a: string, b: string): number {
@@ -12,6 +12,7 @@ function levenshtein(a: string, b: string): number {
 	const dp = Array.from({ length: m + 1 }, (_, i) =>
 		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
 	);
+
 	for (let i = 1; i <= m; i++)
 		for (let j = 1; j <= n; j++)
 			dp[i][j] =
@@ -144,7 +145,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) error(401, 'Unauthorized');
 	const userId = locals.user.id;
 
-	const key = env.OPENAI_KEY;
+	const key = OPENAI_KEY;
 	if (!key) error(500, 'OPENAI_KEY is not configured');
 
 	const { wordId, hanzi, pinyin, pinyinPlain, english, hskLevel, userAnswer } =
@@ -224,5 +225,5 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		await db.insert(explainsUsers).values({ explainId, userId }).onConflictDoNothing();
 	}
 
-	return json({ explanation });
+	return Response.json({ explanation });
 };

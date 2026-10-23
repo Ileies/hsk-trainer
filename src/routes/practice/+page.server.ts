@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
-import { db } from '$lib/server/db';
-import { vocabulary, userWordState } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary, userWordState } from '#lib/server/db/schema.js';
 import { eq, sql, and } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import {
@@ -8,7 +8,7 @@ import {
 	parseNullableInt,
 	parsePositiveIds,
 	serializePracticeWord
-} from '$lib/server/practice';
+} from '#lib/server/practice.js';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
 	const userId = locals.user!.id;

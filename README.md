@@ -82,17 +82,17 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ### Environment Variables
 
-| Variable       | Required | Description                                              |
-| -------------- | -------- | -------------------------------------------------------- |
-| `DATA_DIR`     | No       | Persistent data directory (default: `./data`), containing `local.db` |
-| `OPENAI_KEY`   | No       | OpenAI API key. AI features are disabled when unset.     |
-| `SMTP_HOST`    | Yes      | SMTP server hostname for sending login emails            |
-| `SMTP_PORT`    | No       | SMTP port (default: `587`)                               |
-| `SMTP_SECURE`  | No       | Set to `true` for TLS (port 465); default `false`        |
-| `SMTP_USER`    | No       | SMTP auth username (omit for unauthenticated relay)      |
-| `SMTP_PASS`    | No       | SMTP auth password                                       |
-| `SMTP_FROM`    | No       | From address (defaults to `noreply@<hostname>`)          |
-| `ADMIN_MAIL`   | No       | Email address that may use the flashcard repair endpoint |
+| Variable      | Required | Description                                                          |
+| ------------- | -------- | -------------------------------------------------------------------- |
+| `DATA_DIR`    | No       | Persistent data directory (default: `./data`), containing `local.db` |
+| `OPENAI_KEY`  | No       | OpenAI API key. AI features are disabled when unset.                 |
+| `SMTP_HOST`   | Yes      | SMTP server hostname for sending login emails                        |
+| `SMTP_PORT`   | No       | SMTP port (default: `587`)                                           |
+| `SMTP_SECURE` | No       | Set to `true` for TLS (port 465); default `false`                    |
+| `SMTP_USER`   | No       | SMTP auth username (omit for unauthenticated relay)                  |
+| `SMTP_PASS`   | No       | SMTP auth password                                                   |
+| `SMTP_FROM`   | No       | From address (defaults to `noreply@<hostname>`)                      |
+| `ADMIN_MAIL`  | No       | Email address that may use the flashcard repair endpoint             |
 
 Relative `DATA_DIR` paths resolve from the working directory. The directory is created automatically. The app, Drizzle commands, and database scripts use the same setting.
 

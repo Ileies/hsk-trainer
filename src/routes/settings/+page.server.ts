@@ -1,6 +1,6 @@
 import type { Actions } from './$types';
-import { db } from '$lib/server/db';
-import { userWordState } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { userWordState } from '#lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 
 export const actions: Actions = {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
-	import { goto, replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import {
@@ -18,7 +18,7 @@
 	import { marked } from 'marked';
 	import { tick, untrack } from 'svelte';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
-	import { practiceSession, type WordResult, type PracticeWord } from '$lib/app.svelte';
+	import { practiceSession, type WordResult, type PracticeWord } from '#lib/app.svelte.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -206,14 +206,14 @@
 		practiceSession.wordId = null;
 		const params = new SvelteURLSearchParams();
 		if (hsk) params.set('hsk', String(hsk));
-		goto(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), {
+		goto(`${resolve('/practice')}${buildPracticeSearch(params)}`, {
 			replaceState: true,
-			invalidateAll: true
+			refreshAll: true
 		});
 	}
 
 	function buildNextParams(lastId: number | null, newSeenIds: number[]) {
-		const params = new SvelteURLSearchParams(page.url.searchParams);
+		const params = new SvelteURLSearchParams(new URL(page.url.href).searchParams);
 		// Always reflect the session's hsk filter - the URL may have lost it
 		// (e.g. after navigating back via the plain /practice nav link)
 		if (practiceSession.hsk) {
@@ -247,7 +247,11 @@
 			practiceSession.wordId = nextData.word?.id ?? null;
 			practiceSession.remaining = nextData.remaining;
 			practiceSession.total = nextData.total;
-			replaceState(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), page.state);
+			goto(`${resolve('/practice')}${buildPracticeSearch(params)}`, {
+				shallow: true,
+				replace: true,
+				state: page.state
+			});
 
 			practiceSession.answer = '';
 			practiceSession.result = null;
@@ -290,22 +294,21 @@
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
-
-<svelte:head>
-	<title>Practice{practiceSession.hsk ? ` - HSK ${practiceSession.hsk}` : ''} - HSK Trainer</title>
-</svelte:head>
-
+<svelte:head
+	><title>Practice{practiceSession.hsk ? ` - HSK ${practiceSession.hsk}` : ''} - HSK Trainer</title
+	></svelte:head
+>
 <!-- Top bar -->
+
 <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-	<a href={resolve('/')} class="btn gap-1 self-start btn-ghost btn-sm">
-		<ArrowLeft size={16} />
-		Dashboard
-	</a>
+	<a href={resolve('/')} class="btn gap-1 self-start btn-ghost btn-sm"
+		><ArrowLeft size={16} />Dashboard</a
+	>
 
 	<div class="flex flex-1 justify-start sm:justify-center">
-		<span class="text-sm font-semibold text-base-content/70">
-			{practiceSession.hsk ? `HSK ${practiceSession.hsk}` : 'All levels'}
-		</span>
+		<span class="text-sm font-semibold text-base-content/70"
+			>{practiceSession.hsk ? `HSK ${practiceSession.hsk}` : 'All levels'}</span
+		>
 	</div>
 
 	<div class="flex flex-col items-end gap-1 self-start sm:self-center">
@@ -379,12 +382,12 @@
 						class="btn btn-primary"
 						onclick={() => {
 							practiceSession.wordId = null;
-							const params = new SvelteURLSearchParams(page.url.searchParams);
+							const params = new SvelteURLSearchParams(new URL(page.url.href).searchParams);
 							params.delete('exclude');
 							params.delete('last');
-							goto(resolve(`/practice${buildPracticeSearch(params)}` as '/practice'), {
+							goto(`${resolve('/practice')}${buildPracticeSearch(params)}`, {
 								replaceState: true,
-								invalidateAll: true
+								refreshAll: true
 							});
 						}}
 					>
@@ -506,11 +509,9 @@
 							<button
 								type="button"
 								class="btn flex-1 gap-1 btn-ghost bg-base-200"
-								onclick={() => (practiceSession.showVocab = true)}
+								onclick={() => (practiceSession.showVocab = true)}><Eye size={16} />Show</button
 							>
-								<Eye size={16} />
-								Show
-							</button>
+
 							<button
 								type="submit"
 								class="btn flex-1 gap-1 btn-primary"
@@ -604,17 +605,13 @@
 						</div>
 						<button
 							class="btn mt-2 text-base-content/40 btn-ghost btn-xs"
-							onclick={() => (practiceSession.showHint = false)}
+							onclick={() => (practiceSession.showHint = false)}>Hide hint</button
 						>
-							Hide hint
-						</button>
 					{:else}
 						<button
 							class="btn gap-1 text-base-content/50 btn-ghost btn-sm"
-							onclick={() => (practiceSession.showHint = true)}
+							onclick={() => (practiceSession.showHint = true)}>Show hint</button
 						>
-							Show hint
-						</button>
 					{/if}
 				</div>
 			{/if}

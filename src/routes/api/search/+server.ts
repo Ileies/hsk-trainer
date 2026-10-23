@@ -1,13 +1,12 @@
-import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { vocabulary } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary } from '#lib/server/db/schema.js';
 import { like, or, sql } from 'drizzle-orm';
 
 export async function GET({ url }) {
 	const q = url.searchParams.get('q')?.trim() ?? '';
 	const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '8'), 50);
 
-	if (!q) return json([]);
+	if (!q) return Response.json([]);
 
 	const qLower = q.toLowerCase();
 	const qNoSpaces = qLower.replace(/\s+/g, '');
@@ -26,5 +25,5 @@ export async function GET({ url }) {
 		.orderBy(vocabulary.hskLevel)
 		.limit(limit);
 
-	return json(results);
+	return Response.json(results);
 }

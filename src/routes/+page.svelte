@@ -1,10 +1,19 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { resolve } from '$app/paths';
-	import { GraduationCap, BookOpen, Zap, ChevronRight, Trophy, Star, User, LogOut } from '@lucide/svelte';
+
+	import {
+		GraduationCap,
+		BookOpen,
+		Zap,
+		ChevronRight,
+		Trophy,
+		Star,
+		User,
+		LogOut
+	} from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
-
 	const totalWords = $derived(data.stats.reduce((sum, s) => sum + s.total, 0));
 	const totalLearned = $derived(data.stats.reduce((sum, s) => sum + (s.learned ?? 0), 0));
 	const overallPct = $derived(totalWords > 0 ? Math.round((totalLearned / totalWords) * 100) : 0);
@@ -39,14 +48,10 @@
 			</p>
 		</div>
 		<div class="flex gap-2 justify-center sm:justify-end">
-			<a href={resolve('/starred')} class="btn btn-ghost gap-2">
-				<Star size={16} class="text-warning" />
-				Starred
-			</a>
-			<a href={resolve('/practice')} class="btn btn-primary gap-2">
-				<Zap size={16} />
-				Practice All
-			</a>
+			<a href={resolve('starred')} class="btn btn-ghost gap-2"
+				><Star size={16} class="text-warning" />Starred</a
+			>
+			<a href={resolve('practice')} class="btn btn-primary gap-2"><Zap size={16} />Practice All</a>
 		</div>
 	</div>
 
@@ -75,6 +80,7 @@
 			{@const learned = stat.learned ?? 0}
 			{@const remaining = stat.total - learned}
 			{@const pct = Math.round((learned / stat.total) * 100)}
+
 			<div class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow">
 				<div class="card-body gap-3">
 					<div class="flex items-center justify-between">
@@ -94,15 +100,12 @@
 					</div>
 
 					<div class="card-actions justify-end items-center mt-1 gap-2">
-						<a
-							href={resolve(`/finished?hsk=${stat.hskLevel}` as '/finished')}
-							class="btn btn-sm gap-1"
-						>
+						<a href={`${resolve('/finished')}?hsk=${stat.hskLevel}`} class="btn btn-sm gap-1">
 							<BookOpen size={14} />
 							Review
 						</a>
 						<a
-							href={resolve(`/practice?hsk=${stat.hskLevel}` as '/practice')}
+							href={`${resolve('/practice')}?hsk=${stat.hskLevel}`}
 							class="btn btn-sm gap-1"
 							class:btn-disabled={remaining === 0}
 						>

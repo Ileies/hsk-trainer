@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
-import { db } from '$lib/server/db';
-import { vocabulary, userWordState } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary, userWordState } from '#lib/server/db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {

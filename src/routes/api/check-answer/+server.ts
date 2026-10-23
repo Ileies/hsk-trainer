@@ -1,9 +1,9 @@
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import OpenAI from 'openai';
-import { env } from '$env/dynamic/private';
+import { OPENAI_KEY } from '$app/env/private';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { userWordState } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { userWordState } from '#lib/server/db/schema.js';
 
 function levenshtein(a: string, b: string): number {
 	const m = a.length,
@@ -11,6 +11,7 @@ function levenshtein(a: string, b: string): number {
 	const dp = Array.from({ length: m + 1 }, (_, i) =>
 		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
 	);
+
 	for (let i = 1; i <= m; i++)
 		for (let j = 1; j <= n; j++)
 			dp[i][j] =
@@ -24,7 +25,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) error(401, 'Unauthorized');
 	const userId = locals.user.id;
 
-	const key = env.OPENAI_KEY;
+	const key = OPENAI_KEY;
 	if (!key) error(500, 'OPENAI_KEY is not configured');
 
 	const { wordId, hanzi, pinyinPlain, english, userAnswer } = await request.json();
@@ -32,7 +33,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const correct = (pinyinPlain as string).replace(/\s/g, '').toLowerCase();
 	const typed = ((userAnswer as string) ?? '').replace(/\s/g, '').toLowerCase();
 
-	if (!typed) return json({ valid: 1, reason: null });
+	if (!typed) return Response.json({ valid: 1, reason: null });
 
 	const dist = levenshtein(correct, typed);
 	const maxLen = Math.max(correct.length, typed.length);
@@ -48,13 +49,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					set: { learned: true, learnedAt: new Date() }
 				});
 		}
-		return json({ valid: 0, reason: null });
+		return Response.json({ valid: 0, reason: null });
 	}
 
 	if (dist === 1 && maxLen >= 5) return accept();
 	if (dist <= 2 && maxLen >= 8) return accept();
 
-	if (ratio >= 0.5) return json({ valid: 1, reason: null });
+	if (ratio >= 0.5) return Response.json({ valid: 1, reason: null });
 
 	const openai = new OpenAI({ apiKey: key });
 
@@ -78,5 +79,5 @@ Reply "0" if it's clearly a typo (student knows the word). Otherwise a short rea
 	const isTypo = text.startsWith('0');
 
 	if (isTypo) return accept();
-	return json({ valid: 1, reason: text || null });
+	return Response.json({ valid: 1, reason: text || null });
 };

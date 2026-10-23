@@ -43,7 +43,7 @@
 
 	function handleSearchKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && search.trim()) {
-			goto(resolve(`/search?q=${encodeURIComponent(search.trim())}` as '/search'));
+			goto(`${resolve('/search')}?q=${encodeURIComponent(search.trim())}`);
 		}
 	}
 
@@ -60,12 +60,12 @@
 		const params = new SvelteURLSearchParams();
 		params.set('id', String(id));
 		if (data.q) params.set('q', data.q);
-		goto(resolve(`/search?${params}` as '/search'));
+		goto(`${resolve('/search')}?${params}`);
 	}
 
 	function backToResults() {
-		if (data.q) goto(resolve(`/search?q=${encodeURIComponent(data.q)}` as '/search'));
-		else goto(resolve('/search'));
+		if (data.q) goto(`${resolve('/search')}?q=${encodeURIComponent(data.q)}`);
+		else goto(resolve('search'));
 	}
 </script>
 
@@ -185,16 +185,15 @@
 				<!-- Actions -->
 				<div class="flex gap-3 mt-8 pt-6 border-t border-base-200">
 					<a
-						href={resolve(`/practice?hsk=${data.word.hskLevel}` as '/practice')}
+						href={`${resolve('/practice')}?hsk=${data.word.hskLevel}`}
 						class="btn btn-primary flex-1 gap-2"
 					>
 						<BookOpen size={16} />
 						Practice HSK {data.word.hskLevel}
 					</a>
-					<a href={resolve('/starred')} class="btn btn-ghost gap-2">
-						<Star size={16} class="text-warning" />
-						Starred
-					</a>
+					<a href={resolve('starred')} class="btn btn-ghost gap-2"
+						><Star size={16} class="text-warning" />Starred</a
+					>
 				</div>
 			</div>
 		</div>
@@ -223,8 +222,7 @@
 				class="btn btn-primary btn-lg"
 				disabled={!search.trim()}
 				onclick={() =>
-					search.trim() &&
-					goto(resolve(`/search?q=${encodeURIComponent(search.trim())}` as '/search'))}
+					search.trim() && goto(`${resolve('/search')}?q=${encodeURIComponent(search.trim())}`)}
 			>
 				Search
 			</button>

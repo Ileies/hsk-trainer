@@ -1,9 +1,9 @@
 import { redirect, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { authTokens, sessions } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { authTokens, sessions } from '#lib/server/db/schema.js';
 import { and, eq, gt } from 'drizzle-orm';
-import { generateToken, SESSION_COOKIE, SESSION_DURATION_MS } from '$lib/server/auth';
+import { generateToken, SESSION_COOKIE, SESSION_DURATION_MS } from '#lib/server/auth.js';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
 	const token = url.searchParams.get('token');

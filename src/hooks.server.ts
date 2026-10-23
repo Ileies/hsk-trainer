@@ -1,9 +1,9 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { sessions, users } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { sessions, users } from '#lib/server/db/schema.js';
 import { and, eq, gt } from 'drizzle-orm';
-import { SESSION_COOKIE } from '$lib/server/auth';
+import { SESSION_COOKIE } from '#lib/server/auth.js';
 
 const PUBLIC_PATHS = ['/login', '/auth/'];
 

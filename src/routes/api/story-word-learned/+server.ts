@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { userWordState } from '$lib/server/db/schema';
-import { json, error } from '@sveltejs/kit';
+import { db } from '#lib/server/db/index.js';
+import { userWordState } from '#lib/server/db/schema.js';
+import { error } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const userId = locals.user?.id;
@@ -38,5 +38,5 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			});
 	}
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

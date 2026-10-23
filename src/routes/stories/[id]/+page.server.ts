@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { db } from '$lib/server/db';
+import { db } from '#lib/server/db/index.js';
 import {
 	stories,
 	storySentences,
@@ -7,7 +7,7 @@ import {
 	sentenceWords,
 	vocabulary,
 	userWordState
-} from '$lib/server/db/schema';
+} from '#lib/server/db/schema.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 

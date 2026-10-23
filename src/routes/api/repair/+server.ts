@@ -1,16 +1,16 @@
-import { json, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import OpenAI from 'openai';
-import { env } from '$env/dynamic/private';
+import { ADMIN_MAIL, OPENAI_KEY } from '$app/env/private';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { vocabulary } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary } from '#lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	const adminEmail = env.ADMIN_MAIL;
+	const adminEmail = ADMIN_MAIL;
 	if (!adminEmail || locals.user?.email !== adminEmail) error(403, 'Forbidden');
 
-	const key = env.OPENAI_KEY;
+	const key = OPENAI_KEY;
 	if (!key) throw error(500, 'OPENAI_KEY is not configured');
 
 	const { wordId, hanzi, pinyin } = await request.json();
@@ -51,5 +51,5 @@ Output ONLY a valid JSON object with a single key "english".`
 
 	await db.update(vocabulary).set({ english: corrected.english }).where(eq(vocabulary.id, wordId));
 
-	return json(corrected);
+	return Response.json(corrected);
 };

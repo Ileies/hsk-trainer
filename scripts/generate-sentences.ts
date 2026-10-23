@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { getDatabasePath } from '$lib/server/db/path';
+import { getDatabasePath } from '#lib/server/db/path.js';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { vocabulary } from '../src/lib/server/db/schema';
 import { isNull, eq } from 'drizzle-orm';

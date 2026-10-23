@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { db } from '$lib/server/db';
-import { users, authTokens, sessions } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { users, authTokens, sessions } from '#lib/server/db/schema.js';
 import { and, eq, gt } from 'drizzle-orm';
 import {
 	generateToken,
@@ -9,8 +9,8 @@ import {
 	TOKEN_DURATION_MS,
 	SESSION_COOKIE,
 	SESSION_DURATION_MS
-} from '$lib/server/auth';
-import { sendMagicLink } from '$lib/server/email';
+} from '#lib/server/auth.js';
+import { sendMagicLink } from '#lib/server/email.js';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) redirect(303, '/');

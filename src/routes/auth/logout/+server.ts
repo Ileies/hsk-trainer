@@ -1,9 +1,9 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { sessions } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { sessions } from '#lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { SESSION_COOKIE } from '$lib/server/auth';
+import { SESSION_COOKIE } from '#lib/server/auth.js';
 
 export const POST: RequestHandler = async ({ cookies }) => {
 	const sessionId = cookies.get(SESSION_COOKIE);

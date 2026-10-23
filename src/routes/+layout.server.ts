@@ -1,5 +1,5 @@
-import { db } from '$lib/server/db';
-import { vocabulary } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary } from '#lib/server/db/schema.js';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {

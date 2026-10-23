@@ -40,7 +40,8 @@
 				<p class="text-base-content/40 text-sm mt-1">
 					Click the star on any word card while studying to save it here.
 				</p>
-				<a href={resolve('/practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
+
+				<a href={resolve('practice')} class="btn btn-primary btn-sm mt-6">Start practicing</a>
 			</div>
 		</div>
 	</div>

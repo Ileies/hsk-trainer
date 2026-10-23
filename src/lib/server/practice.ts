@@ -1,6 +1,6 @@
 import { and, eq, notInArray, sql } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { vocabulary, userWordState } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { vocabulary, userWordState } from '#lib/server/db/schema.js';
 
 export type PracticeWord = {
 	id: number;

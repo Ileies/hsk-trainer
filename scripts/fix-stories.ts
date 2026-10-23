@@ -12,7 +12,7 @@
  *    sentences must not have its zh value mutated by this script.
  */
 import { Database } from 'bun:sqlite';
-import { getDatabasePath } from '$lib/server/db/path';
+import { getDatabasePath } from '#lib/server/db/path.js';
 
 const db = new Database(getDatabasePath());
 db.run('PRAGMA foreign_keys = ON');

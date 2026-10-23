@@ -5,8 +5,8 @@
 	import { quadtree as d3quadtree } from 'd3-quadtree';
 	import { resolve } from '$app/paths';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { buildGraph, bfsDistances } from '$lib/mapGraph';
-	import type { Word, Edge } from '$lib/mapGraph';
+	import { buildGraph, bfsDistances } from '#lib/mapGraph.js';
+	import type { Word, Edge } from '#lib/mapGraph.js';
 	import { Search, Crosshair } from '@lucide/svelte';
 
 	let { words }: { words: Word[] } = $props();
@@ -970,7 +970,7 @@
 								>HSK {fw.hskLevel}</span
 							>
 							<a
-								href={resolve(`/search?q=${encodeURIComponent(fw.hanzi)}` as '/search')}
+								href={`${resolve('/search')}?q=${encodeURIComponent(fw.hanzi)}`}
 								class="text-xs text-primary/70 hover:text-primary transition-colors">details</a
 							>
 						</div>
